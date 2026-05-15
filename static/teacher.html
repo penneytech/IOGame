@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teacher · Classroom IO Game</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <main class="page">
+    <h1>Teacher dashboard</h1>
+    <p>Paste your <strong>teacher token</strong> (printed once when the server
+       started). It is kept in this browser tab only — refreshing keeps it.</p>
+
+    <section class="panel">
+      <label>Teacher token <input id="token" type="password" placeholder="paste token" /></label>
+      <button class="tbtn" onclick="saveToken()">Save</button>
+      <span id="tokStatus"></span>
+    </section>
+
+    <section class="panel">
+      <h2>Match controls</h2>
+      <label>Round length (sec)
+        <input id="dur" type="number" value="120" min="20" max="900" style="max-width: 100px" />
+      </label>
+      <label>Mode
+        <select id="mode">
+          <option value="ffa">Solo (FFA)</option>
+          <option value="team">Team match</option>
+          <option value="ctf">Capture the Flag</option>
+        </select>
+      </label>
+      <div>
+        <button class="tbtn" onclick="api('start_round', {durationSec: +dur.value, mode: document.getElementById('mode').value, lives: +document.getElementById('lives').value})">Start round</button>
+        <button class="tbtn" onclick="api('end_round')">End round</button>
+        <button class="tbtn" onclick="api('reset')">Reset arena</button>
+        <button class="tbtn" onclick="api('clear_projectiles')">Clear projectiles</button>
+        <label style="margin-left:12px;">Lives <input id="lives" type="number" min="1" max="20" value="3" style="width:50px"></label>
+        <label style="display:inline-block; margin-left:12px;">
+          <input id="safeMode" type="checkbox" onchange="api('safe_mode', {enabled: this.checked})" />
+          Safe mode (approve every join)
+        </label>
+      </div>
+      <div style="margin-top:10px;">
+        <button id="botsBtn" class="tbtn" type="button" onclick="toggleBots()">Spawn 20 demo bots</button>
+        <span id="botsStatus" style="color:var(--muted); font-size:13px; margin-left:8px;"></span>
+        <span style="color:var(--muted); font-size:12px; margin-left:8px;">
+          (open <a href="/spectator" target="_blank">/spectator</a> to watch)
+        </span>
+        <button id="aiLogBtn" class="tbtn" type="button" onclick="toggleAiLog()" style="margin-left:14px;">AI log: OFF</button>
+        <span id="aiLogPath" style="color:var(--muted); font-size:12px; margin-left:8px;"></span>
+      </div>
+    </section>
+
+    <div class="tdash-grid">
+      <section class="panel">
+        <h2>Live scoreboard <span id="matchInfo" style="color:var(--muted);font-size:14px;font-weight:400;"></span></h2>
+        <table class="scoreboard">
+          <thead><tr><th>#</th><th>Name</th><th>Char</th><th>Team</th><th>K</th><th>D</th><th>Score</th><th></th></tr></thead>
+          <tbody id="scoreBody"><tr><td colspan="8" style="color:var(--muted)">no players yet</td></tr></tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>Pending approvals</h2>
+        <div id="pending" style="font-size:14px"><em>safe mode is off — joins are automatic.</em></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Server</h2>
+      <pre id="healthOut" style="margin:0">loading…</pre>
+    </section>
+
+    <p class="footer"><a href="/game">Open spectator view</a> · <a href="/">Home</a></p>
+  </main>
+
+  <script>
+    const dur = document.getElementById('dur');
+    function getToken() { return localStorage.getItem('iog.teacher.token') || ''; }
+    function saveToken() {
+      const v = document.getElementById('token').value.trim();
+      if (v) localStorage.setItem('iog.teacher.token', v);
+      document.getElementById('tokStatus').textContent = v ? ' saved' : '';
+      refresh();
+    }
+    document.getElementById('token').value = getToken();
+
+    async function api(path, body) {
+      const r = await fetch('/api/teacher/' + path, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Teacher-Token': getToken()},
+        body: JSON.stringify(body || {}),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) alert('Error: ' + (j.detail || r.statusText));
+      refresh();
+    }
+
+    async function approve(pid, ok) {
+      await api('approve', {pendingId: pid, approved: ok});
+    }
+
+    async function kick(pid) {
+      if (!confirm('Kick this player?')) return;
+      await api('kick', {pid});
+    }
+
+    let botsRunning = false;
+    async function toggleBots() {
+      const path = botsRunning ? 'stop_bots' : 'spawn_bots';
+      await api(path);
+      // refresh() will pick up the new status
+    }
+    async function refreshBotsStatus() {
+      try {
+        const r = await fetch('/api/teacher/bots_status?token=' + encodeURIComponent(getToken()));
+        if (!r.ok) return;
+        const j = await r.json();
+        botsRunning = !!j.running;
+        const btn = document.getElementById('botsBtn');
+        const stat = document.getElementById('botsStatus');
+        if (botsRunning) {
+          btn.textContent = 'Stop demo bots';
+          btn.classList.add('danger');
+          stat.textContent = `${j.count} bots fighting`;
+        } else {
+          btn.textContent = 'Spawn 20 demo bots';
+          btn.classList.remove('danger');
+          stat.textContent = '';
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    let aiLogOn = false;
+    async function toggleAiLog() {
+      const r = await fetch('/api/teacher/ai_logging', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Teacher-Token': getToken()},
+        body: JSON.stringify({enabled: !aiLogOn})
+      });
+      if (!r.ok) return;
+      const j = await r.json();
+      applyAiLogStatus(j);
+    }
+    function applyAiLogStatus(j) {
+      aiLogOn = !!j.enabled;
+      const btn = document.getElementById('aiLogBtn');
+      const lbl = document.getElementById('aiLogPath');
+      btn.textContent = `AI log: ${aiLogOn ? 'ON' : 'OFF'}`;
+      btn.classList.toggle('danger', aiLogOn);
+      lbl.textContent = aiLogOn ? `→ ${j.path}` : '';
+    }
+    async function refreshAiLog() {
+      try {
+        const r = await fetch('/api/teacher/ai_logging?token=' + encodeURIComponent(getToken()));
+        if (!r.ok) return;
+        applyAiLogStatus(await r.json());
+      } catch (_) {}
+    }
+
+    async function refresh() {
+      try {
+        const tok = getToken();
+        const r = await fetch('/api/teacher/state?token=' + encodeURIComponent(tok));
+        if (!r.ok) {
+          document.getElementById('healthOut').textContent = 'auth required (paste token)';
+          return;
+        }
+        const j = await r.json();
+        const m = j.match;
+        document.getElementById('matchInfo').textContent =
+          ` — ${m.status} · ${m.mode} · round #${m.id} · ${m.remaining}s · ${j.players.length} players` +
+          (m.teamScores && (m.mode === 'team' || m.mode === 'ctf')
+            ? ` · Blue ${m.teamScores['1'] ?? 0}-${m.teamScores['2'] ?? 0} Red` : '');
+        document.getElementById('safeMode').checked = !!m.safeMode;
+        if (document.activeElement !== document.getElementById('mode')) {
+          document.getElementById('mode').value = m.mode || 'ffa';
+        }
+
+        const tbody = document.getElementById('scoreBody');
+        const rows = m.scoreboard;
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted)">no players yet</td></tr>';
+        } else {
+          tbody.innerHTML = rows.map((r, i) => {
+            const teamLabel = r.team === 1 ? '<span style="color:#5dd6ff">Blue</span>'
+              : r.team === 2 ? '<span style="color:#ff7a7a">Red</span>' : '—';
+            return `<tr><td>${i+1}</td>
+                 <td><span class="swatch" style="background:${r.color}"></span>${escape(r.username)}</td>
+                 <td>${escape(r.characterName)}</td>
+                 <td>${teamLabel}</td>
+                 <td>${r.kills}</td><td>${r.deaths}</td><td>${r.score}</td>
+                 <td><button class="tbtn danger" onclick="kick('${r.pid}')">Kick</button></td></tr>`;
+          }).join('');
+        }
+
+        const pending = j.pending || [];
+        const pdiv = document.getElementById('pending');
+        if (m.safeMode && pending.length === 0) {
+          pdiv.innerHTML = '<em>no pending joins</em>';
+        } else if (!m.safeMode) {
+          pdiv.innerHTML = '<em>safe mode is off — joins are automatic.</em>';
+        } else {
+          pdiv.innerHTML = pending.map(p => {
+            const total = p.report ? p.report.total : '?';
+            const warns = p.report ? (p.report.warnings || []) : [];
+            return `<div class="panel" style="margin:6px 0">
+              <strong>${escape(p.username)}</strong> as
+              "${escape(p.manifestDump.characterName)}" — cost ${total}/100
+              <div>
+                <button class="tbtn" onclick="approve('${p.pendingId}', true)">Approve</button>
+                <button class="tbtn danger" onclick="approve('${p.pendingId}', false)">Reject</button>
+              </div>
+              ${warns.length ? '<ul>' + warns.map(w => '<li>' + escape(w) + '</li>').join('') + '</ul>' : ''}
+            </div>`;
+          }).join('');
+        }
+
+        const hr = await fetch('/api/health');
+        document.getElementById('healthOut').textContent = JSON.stringify(await hr.json(), null, 2);
+      } catch (e) {
+        document.getElementById('healthOut').textContent = 'error: ' + e;
+      }
+    }
+    function escape(s) {
+      return String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;'}[c]));
+    }
+    refresh();
+    setInterval(refresh, 1500);
+    refreshBotsStatus();
+    setInterval(refreshBotsStatus, 1500);
+    refreshAiLog();
+  </script>
+</body>
+</html>

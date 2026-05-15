@@ -1,0 +1,36 @@
+{
+  "characterName": "Rogue",
+  "color": "purple",
+  "size": 22,
+  "speed": 300,
+  "maxHealth": 70,
+  "powers": [
+    {
+      "name": "Backstab", "key": "space", "cooldownMs": 800,
+      "cast": {
+        "kind": "melee", "color": "purple",
+        "range": 50, "arcDeg": 60,
+        "onHit": [
+          { "effect": "damage", "amount": 22 },
+          { "effect": "stun", "durationMs": 250 }
+        ]
+      }
+    },
+    {
+      "name": "Blink", "key": "f", "cooldownMs": 3500,
+      "cast": {
+        "kind": "dash", "color": "white",
+        "distance": 220, "durationMs": 200, "invulnerable": true
+      }
+    },
+    {
+      "name": "Knife Fan", "key": "q", "cooldownMs": 1800,
+      "cast": {
+        "kind": "projectile", "color": "silver",
+        "speed": 560, "radius": 4, "lifetimeMs": 900,
+        "count": 3, "spreadDeg": 25,
+        "onHit": [{ "effect": "damage", "amount": 10 }]
+      }
+    }
+  ]
+}

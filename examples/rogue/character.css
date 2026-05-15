@@ -1,0 +1,7 @@
+.character-card.rogue {
+  background: linear-gradient(180deg, #2a0040, #5a0080);
+  color: #f5d8ff;
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+}

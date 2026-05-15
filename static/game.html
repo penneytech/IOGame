@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arena · Classroom IO Game</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="arena-body">
+  <div class="arena-topbar">
+    <a class="arena-brand" href="/"><span class="dot"></span> Arena</a>
+    <div id="status" class="status">disconnected</div>
+    <button id="muteBtn" class="back" type="button" title="Toggle sound (M)" aria-label="Toggle sound">🔊</button>
+    <a class="back" href="/student">Editor</a>
+    <a class="back" href="/">Home</a>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="game"></canvas>
+
+    <div id="killFeed" class="kill-feed"></div>
+
+    <div id="playerCard" class="player-card hidden">
+      <div class="pc-row">
+        <div class="pc-portrait" id="pcPortrait"></div>
+        <div class="pc-meta">
+          <div class="pc-name" id="pcName">—</div>
+          <div class="pc-char" id="pcChar"></div>
+        </div>
+      </div>
+      <div class="bar hp"><div class="bar-fill" id="hpFill"></div><span class="bar-label" id="hpLabel">100/100</span></div>
+      <div class="bar stamina"><div class="bar-fill" id="stamFill"></div><span class="bar-label">stamina</span></div>
+      <div class="pc-tip">Shift = sprint &nbsp;·&nbsp; C = dodge roll</div>
+    </div>
+
+    <div id="hotbar" class="hotbar"></div>
+    <div id="banner" class="banner"></div>
+  </div>
+
+  <script src="/static/game_client.js"></script>
+</body>
+</html>

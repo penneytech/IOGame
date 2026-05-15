@@ -1,0 +1,44 @@
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=b64dc67676 name=Ranger powers=['Arrow']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=0cec0450bd name=Pyromancer powers=['Fireball', 'Firewall', 'Phase Step']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=a57ae63e22 name=IceTank powers=['Frost Bolt', 'Cleave', 'Bulwark']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=30dc8bed05 name=Rogue powers=['Knife', 'Backstab', 'Blink']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=85ce9b051a name=Medic powers=['Dart', 'Mend', 'Regen Pool']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=ba62bf972b name=Paladin powers=['Smite', 'Bastion', 'LayOnHands']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=ec24d9894b name=Bomber powers=['Grenade', 'Poison Cloud', 'Roll Away']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=d0ac9964bb name=Berserker powers=['Slash', 'Reaver']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=4f9ae15e9a name=Sniper powers=['Snipe', 'Reposition']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=c717f5f38c name=Shotgunner powers=['Buckshot']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=492f6ac637 name=Stunner powers=['Bolt', 'Net']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=114a29c96e name=Cleric powers=['Light', 'Bless']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=48d75e1845 name=Bruiser powers=['Hammer', 'Wall']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=dbe92f3efe name=Harasser powers=['Needle']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=5327ff29ed name=Stormcaller powers=['Storm', 'Hail']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=2164ababb9 name=Hexer powers=['Curse', 'Rebuke', 'Sip']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=63ac6d429f name=Phantom powers=['Strike', 'Dash A', 'Dash B']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=bdedb4b552 name=Cannoneer powers=['Cannon']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=6a5e979a97 name=GlassCannon powers=['Lance', 'Vanish']
+2026-05-13 12:05:09,040 [INFO] BOT_SPAWN pid=07ac644893 name=Druid powers=['Thorn', 'Grove', 'Bark']
+2026-05-13 12:05:09,318 [INFO] BOT_OUT pid=4f9ae15e9a name=Sniper
+2026-05-13 12:05:09,331 [INFO] BOT_OUT pid=30dc8bed05 name=Rogue
+2026-05-13 12:05:09,345 [INFO] BOT_OUT pid=63ac6d429f name=Phantom
+2026-05-13 12:05:09,377 [INFO] BOT_OUT pid=6a5e979a97 name=GlassCannon
+2026-05-13 12:05:09,380 [INFO] BOT_OUT pid=dbe92f3efe name=Harasser
+2026-05-13 12:05:09,437 [INFO] BOT_OUT pid=d0ac9964bb name=Berserker
+2026-05-13 12:05:09,495 [INFO] BOT_OUT pid=492f6ac637 name=Stunner
+2026-05-13 12:05:09,544 [INFO] BOT_OUT pid=85ce9b051a name=Medic
+2026-05-13 12:05:09,556 [INFO] BOT_OUT pid=b64dc67676 name=Ranger
+2026-05-13 12:05:09,564 [INFO] BOT_OUT pid=ec24d9894b name=Bomber
+2026-05-13 12:05:09,595 [INFO] BOT_OUT pid=5327ff29ed name=Stormcaller
+2026-05-13 12:05:09,617 [INFO] BOT_OUT pid=2164ababb9 name=Hexer
+2026-05-13 12:05:09,641 [INFO] BOT_OUT pid=c717f5f38c name=Shotgunner
+2026-05-13 12:05:09,694 [INFO] BOT_OUT pid=0cec0450bd name=Pyromancer
+2026-05-13 12:05:09,697 [INFO] BOT_OUT pid=07ac644893 name=Druid
+2026-05-13 12:05:09,745 [INFO] BOT_OUT pid=bdedb4b552 name=Cannoneer
+2026-05-13 12:05:09,758 [INFO] BOT_OUT pid=48d75e1845 name=Bruiser
+2026-05-13 12:05:09,907 [INFO] BOT_OUT pid=a57ae63e22 name=IceTank
+2026-05-13 12:05:09,998 [INFO] BOT_OUT pid=114a29c96e name=Cleric
+2026-05-13 12:05:09,998 [INFO] END_REASON last_bot_standing alive=1
+2026-05-13 12:05:09,998 [INFO] SUMMARY ticks=3599 sim_seconds=120.0 errors=0 survivors=['Paladin']
+2026-05-13 12:05:09,998 [INFO] FIRES_BY_POWER {"Light": 237, "Frost Bolt": 142, "Smite": 121, "Thorn": 99, "Needle": 86, "Cleave": 79, "Fireball": 70, "Curse": 68, "Hammer": 59, "Arrow": 57, "Dart": 56, "Bolt": 55, "Buckshot": 52, "Knife": 43, "Grenade": 42, "Slash": 41, "Cannon": 38, "Bless": 29, "Rebuke": 28, "Strike": 26, "Storm": 21, "Phase Step": 21, "Bastion": 20, "Lance": 19, "Bulwark": 16, "Firewall": 15, "Reaver": 15, "LayOnHands": 15, "Roll Away": 14, "Dash B": 13, "Hail": 12, "Wall": 12, "Backstab": 12, "Bark": 10, "Poison Cloud": 9, "Dash A": 9, "Snipe": 8, "Vanish": 8, "Mend": 8, "Grove": 8, "Sip": 8, "Regen Pool": 7, "Blink": 6, "Reposition": 6, "Net": 6}
+2026-05-13 12:05:09,998 [INFO] KILLS_BY_BOT {"IceTank": 10, "Berserker": 6, "Pyromancer": 6, "Stormcaller": 5, "Bruiser": 4, "Druid": 4, "Paladin": 3, "Hexer": 3, "Bomber": 3, "Cannoneer": 3, "Shotgunner": 3, "GlassCannon": 2, "Medic": 2, "Ranger": 2, "Cleric": 2}
+2026-05-13 12:05:09,998 [INFO] DEATHS_BY_BOT {"Harasser": 3, "Rogue": 3, "Stormcaller": 3, "Sniper": 3, "GlassCannon": 3, "Phantom": 3, "Berserker": 3, "Medic": 3, "Pyromancer": 3, "Ranger": 3, "Stunner": 3, "Bomber": 3, "Cannoneer": 3, "Shotgunner": 3, "Hexer": 3, "Druid": 3, "Bruiser": 3, "IceTank": 3, "Cleric": 3, "Paladin": 2}

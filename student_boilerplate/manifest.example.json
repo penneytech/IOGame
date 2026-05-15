@@ -1,0 +1,39 @@
+{
+  "characterName": "Fire Wizard",
+  "color": "orange",
+  "size": 28,
+  "speed": 220,
+  "maxHealth": 100,
+  "powers": [
+    {
+      "name": "Fireball",
+      "key": "space",
+      "cooldownMs": 700,
+      "cast": {
+        "kind": "projectile",
+        "color": "orange",
+        "speed": 480,
+        "radius": 6,
+        "lifetimeMs": 1800,
+        "count": 1,
+        "spreadDeg": 0,
+        "pierce": false,
+        "onHit": [
+          { "effect": "damage", "amount": 18 },
+          { "effect": "dot", "dps": 6, "durationMs": 1500 }
+        ]
+      }
+    },
+    {
+      "name": "Mage Shield",
+      "key": "e",
+      "cooldownMs": 6000,
+      "cast": {
+        "kind": "shield",
+        "color": "cyan",
+        "amount": 40,
+        "durationMs": 2500
+      }
+    }
+  ]
+}

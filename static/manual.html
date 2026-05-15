@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Power Manual · Classroom IO Game</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <style>
+    .manual h2 { color: var(--accent); margin-top: 28px; }
+    .manual h3 { color: var(--accent-2); margin-bottom: 4px; }
+    .manual table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; }
+    .manual th, .manual td {
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+      vertical-align: top;
+      text-align: left;
+      font-size: 13px;
+    }
+    .manual th { background: var(--panel-2); color: var(--accent-2); }
+    .manual code { background: #0b0d15; padding: 1px 5px; border-radius: 4px; }
+    .manual pre {
+      background: #0b0d15;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <main class="page manual">
+    <h1>Power Manual</h1>
+    <p>Your character lives in <code>character.py</code>. You write a function
+       <code>build_character()</code> that returns a dictionary. Inside
+       <code>powers</code> is a list of power dicts, and every power has the
+       same outer shape:</p>
+    <pre>{
+  "name": "My Power",
+  "key": "space",          # press this key to use it
+  "cooldownMs": 800,       # 150 .. 15000
+  "cast": { "kind": "...", ...stuff that depends on the kind }
+}</pre>
+    <p>Python tip: use <code>True</code> / <code>False</code> (capital first
+       letter) and <code>None</code> instead of JS <code>true</code> /
+       <code>false</code> / <code>null</code>.</p>
+
+    <h2>The 6 cast kinds</h2>
+    <p>The <code>cast.kind</code> picks <em>how</em> the power is delivered.</p>
+
+    <h3>1. <code>projectile</code></h3>
+    <p>Fires one or more flying objects from your character.</p>
+    <table>
+      <tr><th>Field</th><th>Range</th><th>What it does</th></tr>
+      <tr><td><code>color</code></td><td>name or <code>#hex</code></td><td>Colour of the projectile.</td></tr>
+      <tr><td><code>speed</code></td><td>50 .. 900</td><td>Pixels per second.</td></tr>
+      <tr><td><code>radius</code></td><td>2 .. 30</td><td>Bigger = easier to hit with.</td></tr>
+      <tr><td><code>lifetimeMs</code></td><td>200 .. 5000</td><td>How long it lives before fading.</td></tr>
+      <tr><td><code>count</code></td><td>1 .. 6</td><td>Number of projectiles fired at once.</td></tr>
+      <tr><td><code>spreadDeg</code></td><td>0 .. 180</td><td>How wide the fan of projectiles is (only matters when count &gt; 1).</td></tr>
+      <tr><td><code>pierce</code></td><td>true / false</td><td>If true, the projectile passes through one target and keeps going.</td></tr>
+      <tr><td><code>onHit</code></td><td>1 .. 3 effects</td><td>What happens to whoever it hits.</td></tr>
+    </table>
+
+    <h3>2. <code>area</code></h3>
+    <p>Drops a circle on the ground that ticks effects to anyone (other than you) standing in it.</p>
+    <table>
+      <tr><th>Field</th><th>Range</th><th>What it does</th></tr>
+      <tr><td><code>color</code></td><td>name or <code>#hex</code></td><td>Colour of the area.</td></tr>
+      <tr><td><code>radius</code></td><td>20 .. 150</td><td>Size of the circle.</td></tr>
+      <tr><td><code>durationMs</code></td><td>100 .. 6000</td><td>How long it lasts.</td></tr>
+      <tr><td><code>tickIntervalMs</code></td><td>100 .. 1000</td><td>How often it applies its effects.</td></tr>
+      <tr><td><code>onTick</code></td><td>1 .. 3 effects</td><td>Effects applied each tick.</td></tr>
+    </table>
+
+    <h3>3. <code>melee</code></h3>
+    <p>An instant cone-shaped swing in front of you. No projectile travels.</p>
+    <table>
+      <tr><th>Field</th><th>Range</th><th>What it does</th></tr>
+      <tr><td><code>color</code></td><td>name or <code>#hex</code></td><td>Visual flash colour.</td></tr>
+      <tr><td><code>range</code></td><td>20 .. 140</td><td>How far in front of you the swing reaches.</td></tr>
+      <tr><td><code>arcDeg</code></td><td>30 .. 180</td><td>How wide the cone is.</td></tr>
+      <tr><td><code>onHit</code></td><td>1 .. 3 effects</td><td>Effects applied to anyone caught in the cone.</td></tr>
+    </table>
+
+    <h3>4. <code>dash</code></h3>
+    <p>Quickly move yourself in your facing direction. Great for escaping.</p>
+    <table>
+      <tr><th>Field</th><th>Range</th><th>What it does</th></tr>
+      <tr><td><code>color</code></td><td>name or <code>#hex</code></td><td>(Currently cosmetic.)</td></tr>
+      <tr><td><code>distance</code></td><td>40 .. 400</td><td>How far you teleport.</td></tr>
+      <tr><td><code>durationMs</code></td><td>80 .. 600</td><td>If <code>invulnerable</code>, you're untouchable for this long.</td></tr>
+      <tr><td><code>invulnerable</code></td><td>true / false</td><td>Avoid all damage during the dash.</td></tr>
+    </table>
+
+    <h3>5. <code>shield</code></h3>
+    <p>Self-buff. Absorbs incoming damage up to <code>amount</code>.</p>
+    <table>
+      <tr><th>Field</th><th>Range</th><th>What it does</th></tr>
+      <tr><td><code>color</code></td><td>name or <code>#hex</code></td><td>Aura colour.</td></tr>
+      <tr><td><code>amount</code></td><td>5 .. 200</td><td>HP of damage soaked.</td></tr>
+      <tr><td><code>durationMs</code></td><td>200 .. 8000</td><td>How long it lasts.</td></tr>
+    </table>
+
+    <h3>6. <code>heal</code></h3>
+    <p>Self-buff. Instantly restore HP (capped at your max).</p>
+    <table>
+      <tr><th>Field</th><th>Range</th><th>What it does</th></tr>
+      <tr><td><code>color</code></td><td>name or <code>#hex</code></td><td>Visual colour.</td></tr>
+      <tr><td><code>amount</code></td><td>1 .. 80</td><td>HP restored.</td></tr>
+    </table>
+
+    <h2>The 6 effect kinds</h2>
+    <p>Effects go inside <code>onHit</code> (projectile / melee) or <code>onTick</code> (area).</p>
+    <table>
+      <tr><th>Effect</th><th>Fields</th><th>What it does</th></tr>
+      <tr>
+        <td><code>damage</code></td>
+        <td><code>amount</code> 1..60</td>
+        <td>Reduces target HP. Blocked by an active shield.</td>
+      </tr>
+      <tr>
+        <td><code>heal</code></td>
+        <td><code>amount</code> 1..80</td>
+        <td>Increases target HP (rare on offensive powers, but allowed in areas).</td>
+      </tr>
+      <tr>
+        <td><code>slow</code></td>
+        <td><code>factor</code> 0.1..0.95<br><code>durationMs</code> 100..6000</td>
+        <td>Multiplies the target's movement speed for the duration.</td>
+      </tr>
+      <tr>
+        <td><code>stun</code></td>
+        <td><code>durationMs</code> 100..2000</td>
+        <td>Target can't move or fire.</td>
+      </tr>
+      <tr>
+        <td><code>knockback</code></td>
+        <td><code>strength</code> 50..600</td>
+        <td>Pushes the target away from the source of the hit.</td>
+      </tr>
+      <tr>
+        <td><code>dot</code></td>
+        <td><code>dps</code> 1..30<br><code>durationMs</code> 100..6000</td>
+        <td>Damage over time. Multiple DoTs stack.</td>
+      </tr>
+    </table>
+
+    <h2>Examples</h2>
+
+    <h3>A piercing magic arrow</h3>
+    <pre>{
+  "name": "Magic Arrow", "key": "space", "cooldownMs": 700,
+  "cast": {
+    "kind": "projectile", "color": "purple",
+    "speed": 600, "radius": 5, "lifetimeMs": 1500,
+    "count": 1, "pierce": True,
+    "onHit": [{"effect": "damage", "amount": 18}],
+  },
+}</pre>
+
+    <h3>A shotgun fan</h3>
+    <pre>{
+  "name": "Scattershot", "key": "space", "cooldownMs": 1200,
+  "cast": {
+    "kind": "projectile", "color": "yellow",
+    "speed": 500, "radius": 5, "lifetimeMs": 800,
+    "count": 5, "spreadDeg": 40,
+    "onHit": [{"effect": "damage", "amount": 8}],
+  },
+}</pre>
+
+    <h3>A poison cloud (area)</h3>
+    <pre>{
+  "name": "Poison Cloud", "key": "q", "cooldownMs": 4000,
+  "cast": {
+    "kind": "area", "color": "green",
+    "radius": 90, "durationMs": 3000, "tickIntervalMs": 250,
+    "onTick": [
+      {"effect": "dot", "dps": 10, "durationMs": 1000},
+      {"effect": "slow", "factor": 0.6, "durationMs": 800},
+    ],
+  },
+}</pre>
+
+    <h3>A defensive shield</h3>
+    <pre>{
+  "name": "Bulwark", "key": "e", "cooldownMs": 6000,
+  "cast": {"kind": "shield", "color": "cyan", "amount": 60, "durationMs": 4000},
+}</pre>
+
+    <h3>An invulnerable dash</h3>
+    <pre>{
+  "name": "Blink", "key": "f", "cooldownMs": 3000,
+  "cast": {"kind": "dash", "color": "white", "distance": 220,
+           "durationMs": 200, "invulnerable": True},
+}</pre>
+
+    <h3>A melee swing with knockback + stun</h3>
+    <pre>{
+  "name": "Hammer", "key": "space", "cooldownMs": 900,
+  "cast": {
+    "kind": "melee", "color": "orange",
+    "range": 80, "arcDeg": 90,
+    "onHit": [
+      {"effect": "damage", "amount": 22},
+      {"effect": "knockback", "strength": 240},
+      {"effect": "stun", "durationMs": 300},
+    ],
+  },
+}</pre>
+
+    <h3>A complete <code>build_character()</code></h3>
+    <p>Drop powers into <code>powers</code> and return the whole character:</p>
+    <pre>def build_character():
+    fireball = {
+        "name": "Fireball", "key": "space", "cooldownMs": 600,
+        "cast": {
+            "kind": "projectile", "color": "orange",
+            "speed": 540, "radius": 6, "lifetimeMs": 1400,
+            "count": 1,
+            "onHit": [
+                {"effect": "damage", "amount": 16},
+                {"effect": "dot", "dps": 8, "durationMs": 1500},
+            ],
+        },
+    }
+
+    blink = {
+        "name": "Blink", "key": "f", "cooldownMs": 3500,
+        "cast": {
+            "kind": "dash", "color": "white",
+            "distance": 220, "durationMs": 200, "invulnerable": True,
+        },
+    }
+
+    return {
+        "characterName": "My Mage",
+        "color": "#ff6a3d",
+        "size": 22,
+        "speed": 230,
+        "maxHealth": 90,
+        "powers": [fireball, blink],
+    }</pre>
+    <p>The first power’s <code>key</code> is the one that fires when you click;
+       the rest fire when you press their key. Use single-character keys
+       (<code>"space"</code>, <code>"q"</code>, <code>"e"</code>, <code>"f"</code>) so you can
+       reach them while moving with WASD.</p>
+
+    <h2>Controls &amp; movement</h2>
+    <ul>
+      <li><strong>WASD</strong> or arrow keys to move. Movement has a little
+          weight — quick taps now feel like dodges.</li>
+      <li><strong>Mouse</strong> aims your character. You can run one way
+          while shooting another, just like a real twin-stick game.</li>
+      <li><strong>Shift</strong> to sprint, <strong>C</strong> to dodge-roll
+          (brief invulnerability), <strong>M</strong> to mute sound.</li>
+      <li>Each power has its own key (set in your manifest). Press it once to
+          fire — the cooldown is shown above your hotbar.</li>
+    </ul>
+
+    <h2>Game modes</h2>
+    <ul>
+      <li><strong>Solo (FFA)</strong> — every player for themself. Score = kills − deaths.</li>
+      <li><strong>Team match</strong> — players are split into Blue and Red. Friendly
+          fire is OFF, so you can support teammates with heals and shields safely.
+          Whichever team has the higher total score at the end wins.</li>
+      <li><strong>Capture the Flag</strong> — two flags, one base each. Touch the
+          enemy flag to pick it up, then carry it back to your own base to score.
+          Die while carrying and the flag returns home. First team to 3 captures wins.</li>
+    </ul>
+    <p>The teacher chooses the mode when starting each round.</p>
+
+    <h2>Build budget &amp; balance</h2>
+    <p>Every character has a hard cap of <strong>100 build points</strong>.
+       The server will reject any manifest that costs more. The editor shows
+       you a live cost breakdown after <em>Run &amp; Validate</em>.</p>
+    <p>Roughly speaking:</p>
+    <ul>
+      <li><strong>Stat costs</strong> — extra HP, extra speed, smaller hitbox,
+        and extra power slots all cost points. The first power is "free".</li>
+      <li><strong>Power costs</strong> = <code>cast cost &times; cooldown
+        factor</code>. A short cooldown multiplies a power's cost; a long
+        cooldown shrinks it.</li>
+      <li><strong>Effect costs</strong> — damage, heal, slow, stun, knockback,
+        and DoT each cost based on their numbers.</li>
+    </ul>
+    <p>So you really cannot make a character that has max HP, max speed, max
+       damage, and instant cooldowns. The system forces tradeoffs.</p>
+
+    <h2>Class archetypes</h2>
+    <p>These are <em>shapes</em>, not rules. Build whatever you want — but
+       starting from one of these makes your character feel coherent.</p>
+    <table>
+      <thead><tr><th>Archetype</th><th>Strengths</th><th>Weaknesses</th><th>Try</th></tr></thead>
+      <tbody>
+        <tr><td>Tank</td><td>HP, shields, slows, knockback</td><td>slow, low damage</td><td>Ice Tank</td></tr>
+        <tr><td>Assassin</td><td>burst melee + dash</td><td>fragile, short range</td><td>Rogue</td></tr>
+        <tr><td>Mage</td><td>area control, DoT, multi-shot</td><td>long cooldowns</td><td>Fire Wizard</td></tr>
+        <tr><td>Healer</td><td>heal cast, regen area</td><td>weak attacks</td><td>Medic</td></tr>
+        <tr><td>Bruiser</td><td>melee + knockback + shield</td><td>medium range</td><td>Paladin</td></tr>
+        <tr><td>Controller</td><td>area + knockback + slow</td><td>low DPS</td><td>Bomber</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Fun-but-fair philosophy</h2>
+    <p>The goal is <em>not</em> to make the most overpowered character. The goal
+       is to design something creative, readable, and fun for someone else to
+       play against. A character that wins by being annoying loses respect.
+       Aim for something you'd enjoy fighting.</p>
+
+    <p class="footer">
+      <a href="/student">&larr; Back to editor</a> ·
+      <a href="/challenges">Challenge cards</a> ·
+      <a href="/">Home</a>
+    </p>
+  </main>
+</body>
+</html>

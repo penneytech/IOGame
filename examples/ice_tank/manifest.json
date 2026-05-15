@@ -1,0 +1,37 @@
+{
+  "characterName": "Ice Tank",
+  "color": "cyan",
+  "size": 38,
+  "speed": 132,
+  "maxHealth": 240,
+  "powers": [
+    {
+      "name": "Ice Spear", "key": "space", "cooldownMs": 900,
+      "cast": {
+        "kind": "projectile", "color": "cyan",
+        "speed": 420, "radius": 6, "lifetimeMs": 1500,
+        "count": 1, "spreadDeg": 0, "pierce": true,
+        "onHit": [
+          { "effect": "damage", "amount": 12 },
+          { "effect": "slow", "factor": 0.5, "durationMs": 1000 }
+        ]
+      }
+    },
+    {
+      "name": "Bulwark", "key": "e", "cooldownMs": 8000,
+      "cast": { "kind": "shield", "color": "cyan", "amount": 80, "durationMs": 4000 }
+    },
+    {
+      "name": "Shield Bash", "key": "f", "cooldownMs": 2500,
+      "cast": {
+        "kind": "melee", "color": "blue",
+        "range": 70, "arcDeg": 90,
+        "onHit": [
+          { "effect": "damage", "amount": 18 },
+          { "effect": "knockback", "strength": 300 },
+          { "effect": "stun", "durationMs": 400 }
+        ]
+      }
+    }
+  ]
+}

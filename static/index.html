@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Classroom IO Game</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="splash-bg">
+  <div class="splash-stars" aria-hidden="true"></div>
+  <main class="home splash">
+    <header class="splash-head">
+      <div class="brand-pill">
+        <span class="brand-dot"></span>
+        <span>Classroom <span class="accent">IO</span></span>
+      </div>
+      <h1 class="splash-title">Code your champion. <span class="accent">Enter the arena.</span></h1>
+      <p class="lede">A real-time multiplayer game where every player programs their own character with JavaScript.</p>
+    </header>
+
+    <div class="cards splash-cards">
+      <a class="card splash-card sc-student" href="/student">
+        <div class="sc-icon">⚔</div>
+        <h2>I'm a Student</h2>
+        <p>Edit your character in the browser, test it, and join the arena.</p>
+        <span class="sc-cta">Open editor →</span>
+      </a>
+      <a class="card splash-card sc-play" href="/game">
+        <div class="sc-icon">▶</div>
+        <h2>Quick Play</h2>
+        <p>Jump straight into the arena with a default character.</p>
+        <span class="sc-cta">Play now →</span>
+      </a>
+      <a class="card splash-card sc-teacher" href="/teacher">
+        <div class="sc-icon">★</div>
+        <h2>I'm the Teacher</h2>
+        <p>Manage rounds, modes, scoreboard and connected players.</p>
+        <span class="sc-cta">Open dashboard →</span>
+      </a>
+    </div>
+
+    <footer class="splash-foot">
+      Read the <a href="/manual">Power Manual</a>, browse
+      <a href="/challenges">Challenge cards</a>, open the
+      <a href="/spectator">Big-screen Spectator</a>, or print your LAN IP with
+      <code>python scripts/print_lan_ip.py</code>.
+    </footer>
+  </main>
+</body>
+</html>

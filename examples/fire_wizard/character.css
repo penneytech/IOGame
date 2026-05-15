@@ -1,0 +1,7 @@
+.character-card.fire {
+  background: linear-gradient(180deg, #4a1500, #8a2a00);
+  color: #ffe2b8;
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+}

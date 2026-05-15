@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Arena · Spectator</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="spectator-body">
+  <div id="spec-root">
+    <div id="spec-stage">
+      <canvas id="spec-canvas"></canvas>
+      <div id="spec-mode-pill" class="spec-pill">ARENA</div>
+      <div id="spec-match-bar" class="spec-match-bar">
+        <span id="spec-match-mode" class="smb-mode">FFA</span>
+        <span id="spec-match-status" class="smb-status">—</span>
+        <span id="spec-match-time" class="smb-time">—</span>
+      </div>
+      <div id="spec-help" class="spec-help">
+        <kbd>1</kbd> Arena &nbsp; <kbd>2</kbd> Quad &nbsp; <kbd>3</kbd> Follow leader &nbsp; <kbd>[</kbd>/<kbd>]</kbd> Pick player &nbsp; <kbd>H</kbd> Hide help
+      </div>
+    </div>
+    <aside id="spec-side">
+      <div class="spec-title">
+        <span class="spec-dot"></span>
+        <span>LIVE · Arena</span>
+      </div>
+      <div id="spec-status" class="spec-status">Connecting…</div>
+      <div class="spec-meta">
+        <div><span class="lbl">Players</span><span id="spec-count">0</span></div>
+        <div><span class="lbl">Watching</span><span id="spec-watchers">0</span></div>
+        <div><span class="lbl">Tick</span><span id="spec-tick">—</span></div>
+      </div>
+      <div id="spec-team-scores" class="spec-team-scores" hidden>
+        <div class="team-pill team-blue">Blue <b id="spec-team-blue">0</b></div>
+        <div class="team-pill team-red">Red <b id="spec-team-red">0</b></div>
+      </div>
+      <div class="spec-board-title">Scoreboard</div>
+      <ol id="spec-board" class="spec-board"></ol>
+    </aside>
+  </div>
+  <script src="/static/spectator.js" defer></script>
+</body>
+</html>
