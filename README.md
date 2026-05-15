@@ -18,13 +18,27 @@ The framework teaches:
 
 ## What the teacher does
 
-1. Install Python 3.11+.
+1. Install Python 3.11 through 3.13.
+   - On macOS, if `python` is not available, use `python3`.
 2. From this folder run:
 
    ```bash
    pip install -r requirements.txt
    python -m server.main
    ```
+
+   If `pip install` fails due to a Homebrew-managed environment, proxy/network restrictions, or other local package issues, use a local virtual environment instead:
+
+   ```bash
+   python3.13 -m venv .venv
+   source .venv/bin/activate
+   python -m pip install -r requirements.txt
+   python -m server.main
+   ```
+
+   If you are using Python 3.14, install may fail because `pydantic-core` is not yet compatible with that interpreter. In that case, use Python 3.13 or earlier.
+
+   Without the dependencies installed, the server will fail with errors such as `ModuleNotFoundError: No module named 'fastapi'`.
 
    The server listens on `0.0.0.0:8000` so other devices on the same LAN can
    connect.
@@ -68,8 +82,11 @@ classroom-io-game/
 
 ## Running tests
 
+First activate the virtual environment created earlier:
+
 ```bash
-pip install -r requirements.txt
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 pytest -q
 ```
 
