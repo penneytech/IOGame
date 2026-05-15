@@ -149,15 +149,32 @@
     const btn = document.getElementById('muteBtn');
     if (btn) btn.textContent = SFX.isMuted() ? '🔇' : '🔊';
   }
-  document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('muteBtn');
-    if (btn) btn.addEventListener('click', toggleMute);
-  });
-  // In case DOM is already ready:
-  {
-    const btn = document.getElementById('muteBtn');
-    if (btn) btn.addEventListener('click', toggleMute);
+  function toggleFx() {
+    setFxMode(fxMode === 'high' ? 'low' : 'high');
+    fitCanvas();
   }
+  function wireToolbarButtons() {
+    const m = document.getElementById('muteBtn');
+    if (m) m.addEventListener('click', toggleMute);
+    const f = document.getElementById('fxBtn');
+    if (f) {
+      f.addEventListener('click', toggleFx);
+      f.textContent = fxMode === 'high' ? 'FX: High' : 'FX: Low';
+    }
+  }
+  document.addEventListener('DOMContentLoaded', wireToolbarButtons);
+  // Defer in case DOM is already ready, so all `let` bindings (fxMode etc.)
+  // declared further down in this IIFE are initialized before we read them.
+  setTimeout(wireToolbarButtons, 0);
+
+  // FX quality mode (low/high). Declared early because fitCanvas() reads it.
+  // 'low' (default) skips per-frame radial gradients, shadowBlur on the
+  // boundary, twinkling stars, nebulae and pulse rings — these were the
+  // cause of choppy framerates on older hardware. Toggle via the FX button
+  // or press 'F'. Persisted in localStorage.
+  let fxMode = (() => {
+    try { return localStorage.getItem('iogame.fx') || 'low'; } catch (_) { return 'low'; }
+  })();
 
   function setStatus(text, cls) {
     statusEl.textContent = text;
@@ -166,8 +183,12 @@
 
   function fitCanvas() {
     // Render at the CSS pixel size of the canvas for crisp output.
+    // In low-FX mode we cap DPR at 1 — on a hi-DPI laptop the canvas would
+    // otherwise be drawing 4x the pixels, which is the second-biggest perf
+    // hit after the animated background.
     const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
+    const dprRaw = window.devicePixelRatio || 1;
+    const dpr = fxMode === 'high' ? Math.min(dprRaw, 2) : 1;
     canvas.width = Math.floor(rect.width * dpr);
     canvas.height = Math.floor(rect.height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -305,6 +326,7 @@
       ws.send(JSON.stringify({ type: 'roll' }));
     }
     if (k === 'm') toggleMute();
+    if (k === 'f') toggleFx();
   });
   window.addEventListener('keyup', (ev) => {
     const k = normalizeKey(ev);
@@ -379,16 +401,28 @@
     return { ox, oy };
   }
 
+  // FX quality. fxMode is declared earlier so fitCanvas() can read it.
+  // setFxMode lives here next to the cache builders it depends on.
+  function setFxMode(m) {
+    fxMode = m;
+    try { localStorage.setItem('iogame.fx', m); } catch (_) {}
+    rebuildBgCaches();
+    const btn = document.getElementById('fxBtn');
+    if (btn) btn.textContent = m === 'high' ? 'FX: High' : 'FX: Low';
+  }
+
+  // Star field. In low mode this is rendered ONCE to an offscreen canvas
+  // (3200x2200) and blitted with parallax — a single drawImage per frame
+  // instead of 380 arc() calls.
   const stars = (() => {
     const out = [];
     let s = 0x9e3779b1;
     function rnd() { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }
-    for (let i = 0; i < 380; i++) {
+    for (let i = 0; i < 220; i++) {
       out.push({
         x: rnd() * 3200, y: rnd() * 2200,
         r: rnd() * 1.6 + 0.3,
         a: rnd() * 0.6 + 0.2,
-        // twinkle phase + speed
         ph: rnd() * Math.PI * 2,
         sp: 0.4 + rnd() * 1.2,
       });
@@ -402,17 +436,91 @@
   const bgImage = (() => {
     const img = new Image();
     img.src = '/static/background.png';
-    img.onerror = () => { img._failed = true; };
+    img.onload = () => rebuildBgCaches();
+    img.onerror = () => { img._failed = true; rebuildBgCaches(); };
     return img;
   })();
 
-  // Slow-drifting coloured nebula blobs across the arena floor.
+  // High-FX-only nebulae.
   const nebulae = [
     { x: 0.20, y: 0.30, r: 380, c: 'rgba(93, 214, 255, 0.10)', sp: 0.07 },
     { x: 0.75, y: 0.20, r: 460, c: 'rgba(255, 100, 180, 0.08)', sp: 0.05 },
     { x: 0.55, y: 0.75, r: 520, c: 'rgba(255, 177, 59, 0.09)', sp: 0.06 },
     { x: 0.10, y: 0.85, r: 320, c: 'rgba(160, 110, 255, 0.10)', sp: 0.09 },
   ];
+
+  // -------- Pre-rendered background caches --------
+  // arenaCache: world-sized offscreen canvas with floor + bg image + grid +
+  //   boundary glow baked in. Drawn with one drawImage per frame.
+  // starCache: 3200x2200 offscreen canvas with all stars.
+  // vignetteCache: viewport-sized radial gradient backdrop.
+  let arenaCache = null;
+  let starCache = null;
+  let vignetteCache = null;
+  let vignetteCacheSize = { w: 0, h: 0 };
+
+  function rebuildBgCaches() {
+    // --- arena layer (world.width x world.height) ---
+    arenaCache = document.createElement('canvas');
+    arenaCache.width = world.width;
+    arenaCache.height = world.height;
+    const a = arenaCache.getContext('2d');
+    a.fillStyle = 'rgba(14, 18, 38, 0.92)';
+    a.fillRect(0, 0, world.width, world.height);
+    if (bgImage && !bgImage._failed && bgImage.complete && bgImage.naturalWidth > 0) {
+      a.globalAlpha = 0.72;
+      a.drawImage(bgImage, 0, 0, world.width, world.height);
+      a.globalAlpha = 1;
+      a.fillStyle = 'rgba(8, 10, 24, 0.42)';
+      a.fillRect(0, 0, world.width, world.height);
+    }
+    // grid
+    a.strokeStyle = 'rgba(255,255,255,0.05)';
+    a.lineWidth = 1;
+    const step = 80;
+    for (let x = 0; x <= world.width; x += step) {
+      a.beginPath(); a.moveTo(x + 0.5, 0); a.lineTo(x + 0.5, world.height); a.stroke();
+    }
+    for (let y = 0; y <= world.height; y += step) {
+      a.beginPath(); a.moveTo(0, y + 0.5); a.lineTo(world.width, y + 0.5); a.stroke();
+    }
+    // boundary (no shadowBlur — baked thicker stroke instead)
+    a.strokeStyle = 'rgba(255, 177, 59, 0.95)';
+    a.lineWidth = 4;
+    a.strokeRect(2, 2, world.width - 4, world.height - 4);
+    a.strokeStyle = 'rgba(255, 177, 59, 0.35)';
+    a.lineWidth = 8;
+    a.strokeRect(2, 2, world.width - 4, world.height - 4);
+
+    // --- star layer (3200x2200, fixed) ---
+    starCache = document.createElement('canvas');
+    starCache.width = 3200;
+    starCache.height = 2200;
+    const sc = starCache.getContext('2d');
+    sc.fillStyle = '#ffffff';
+    for (const s of stars) {
+      sc.globalAlpha = s.a;
+      sc.beginPath(); sc.arc(s.x, s.y, s.r, 0, Math.PI * 2); sc.fill();
+    }
+    sc.globalAlpha = 1;
+
+    vignetteCache = null; // force rebuild on next draw
+  }
+
+  function ensureVignette(w, h) {
+    if (vignetteCache && vignetteCacheSize.w === w && vignetteCacheSize.h === h) return;
+    vignetteCache = document.createElement('canvas');
+    vignetteCache.width = w;
+    vignetteCache.height = h;
+    const v = vignetteCache.getContext('2d');
+    const g = v.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.2,
+                                     w / 2, h / 2, Math.max(w, h) * 0.8);
+    g.addColorStop(0, '#13162a');
+    g.addColorStop(1, '#03040a');
+    v.fillStyle = g;
+    v.fillRect(0, 0, w, h);
+    vignetteCacheSize = { w, h };
+  }
 
   // ----- Sprite cache + per-player animation state -----
   const spriteCache = Object.create(null); // dataURI -> HTMLImageElement
@@ -440,90 +548,45 @@
 
   function drawBackground(ox, oy) {
     const { w, h } = viewportSize();
-    const tNow = performance.now() / 1000;
-    // Vignette outside the world.
-    const grad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.2,
-                                          w / 2, h / 2, Math.max(w, h) * 0.8);
-    grad.addColorStop(0, '#13162a');
-    grad.addColorStop(1, '#03040a');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
-    // Twinkling parallax stars.
-    ctx.fillStyle = '#ffffff';
-    for (const s of stars) {
-      const sx = ox * 0.3 + s.x;
-      const sy = oy * 0.3 + s.y;
-      if (sx < -2 || sy < -2 || sx > w + 2 || sy > h + 2) continue;
-      const tw = 0.55 + 0.45 * Math.sin(tNow * s.sp + s.ph);
-      ctx.globalAlpha = s.a * tw;
-      ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-    // Arena floor base.
-    ctx.fillStyle = 'rgba(14, 18, 38, 0.92)';
-    ctx.fillRect(ox, oy, world.width, world.height);
-    // Optional user-supplied background image (washed-out for contrast).
-    if (bgImage && !bgImage._failed && bgImage.complete && bgImage.naturalWidth > 0) {
+    if (!arenaCache) rebuildBgCaches();
+    ensureVignette(w, h);
+    // 1) Vignette (cached, single blit).
+    ctx.drawImage(vignetteCache, 0, 0);
+    // 2) Star field at parallax (cached, single blit).
+    ctx.drawImage(starCache, ox * 0.3, oy * 0.3);
+    // 3) Arena floor + bg image + grid + boundary (cached, single blit).
+    ctx.drawImage(arenaCache, ox, oy);
+    // 4) High-FX extras: nebulae + pulse rings.
+    if (fxMode === 'high') {
+      const tNow = performance.now() / 1000;
       ctx.save();
-      ctx.beginPath(); ctx.rect(ox, oy, world.width, world.height); ctx.clip();
-      ctx.globalAlpha = 0.72;
-      ctx.drawImage(bgImage, ox, oy, world.width, world.height);
-      ctx.globalAlpha = 1;
-      // Dark wash to push the image back so characters pop.
-      ctx.fillStyle = 'rgba(8, 10, 24, 0.42)';
-      ctx.fillRect(ox, oy, world.width, world.height);
+      ctx.beginPath();
+      ctx.rect(ox, oy, world.width, world.height);
+      ctx.clip();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const n of nebulae) {
+        const dx = Math.cos(tNow * n.sp) * 80;
+        const dy = Math.sin(tNow * n.sp * 1.3) * 60;
+        const cx = ox + n.x * world.width + dx;
+        const cy = oy + n.y * world.height + dy;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, n.r);
+        g.addColorStop(0, n.c);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(cx - n.r, cy - n.r, n.r * 2, n.r * 2);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      const ccx = ox + world.width / 2, ccy = oy + world.height / 2;
+      const maxR = Math.hypot(world.width, world.height) / 2;
+      for (let i = 0; i < 3; i++) {
+        const phase = (tNow * 0.18 + i / 3) % 1;
+        const rr = phase * maxR;
+        ctx.strokeStyle = `rgba(255, 177, 59, ${(1 - phase) * 0.10})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(ccx, ccy, rr, 0, Math.PI * 2); ctx.stroke();
+      }
       ctx.restore();
     }
-    // Drifting coloured nebula blobs (clipped to arena).
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(ox, oy, world.width, world.height);
-    ctx.clip();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const n of nebulae) {
-      const dx = Math.cos(tNow * n.sp) * 80;
-      const dy = Math.sin(tNow * n.sp * 1.3) * 60;
-      const cx = ox + n.x * world.width + dx;
-      const cy = oy + n.y * world.height + dy;
-      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, n.r);
-      g.addColorStop(0, n.c);
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = g;
-      ctx.fillRect(cx - n.r, cy - n.r, n.r * 2, n.r * 2);
-    }
-    // Concentric pulse rings from arena centre.
-    ctx.globalCompositeOperation = 'source-over';
-    const ccx = ox + world.width / 2, ccy = oy + world.height / 2;
-    const maxR = Math.hypot(world.width, world.height) / 2;
-    for (let i = 0; i < 3; i++) {
-      const phase = (tNow * 0.18 + i / 3) % 1;
-      const rr = phase * maxR;
-      ctx.strokeStyle = `rgba(255, 177, 59, ${(1 - phase) * 0.10})`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(ccx, ccy, rr, 0, Math.PI * 2); ctx.stroke();
-    }
-    ctx.restore();
-    // Grid.
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-    ctx.lineWidth = 1;
-    const step = 80;
-    const x0 = ox, y0 = oy, x1 = ox + world.width, y1 = oy + world.height;
-    const startX = Math.max(0, Math.floor((-ox) / step) * step) + ox;
-    for (let x = startX; x <= Math.min(w, x1); x += step) {
-      ctx.beginPath(); ctx.moveTo(x, Math.max(0, y0)); ctx.lineTo(x, Math.min(h, y1)); ctx.stroke();
-    }
-    const startY = Math.max(0, Math.floor((-oy) / step) * step) + oy;
-    for (let y = startY; y <= Math.min(h, y1); y += step) {
-      ctx.beginPath(); ctx.moveTo(Math.max(0, x0), y); ctx.lineTo(Math.min(w, x1), y); ctx.stroke();
-    }
-    // Glowing world boundary.
-    ctx.save();
-    ctx.shadowColor = 'rgba(255, 177, 59, 0.5)';
-    ctx.shadowBlur = 14;
-    ctx.strokeStyle = 'rgba(255, 177, 59, 0.85)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(ox + 1, oy + 1, world.width - 2, world.height - 2);
-    ctx.restore();
   }
 
   function drawAreas(ox, oy) {
@@ -555,14 +618,25 @@
   }
 
   function drawProjectiles(ox, oy) {
+    const high = (fxMode === 'high');
     for (const pr of snapshot.projectiles || []) {
-      // Soft glow halo + bright core.
-      ctx.save();
-      ctx.shadowColor = pr.color;
-      ctx.shadowBlur = 14;
-      ctx.fillStyle = pr.color;
-      ctx.beginPath(); ctx.arc(ox + pr.x, oy + pr.y, pr.radius, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
+      if (high) {
+        // True glow (expensive): shadowBlur.
+        ctx.save();
+        ctx.shadowColor = pr.color;
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = pr.color;
+        ctx.beginPath(); ctx.arc(ox + pr.x, oy + pr.y, pr.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else {
+        // Cheap glow: translucent halo + opaque core.
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = pr.color;
+        ctx.beginPath(); ctx.arc(ox + pr.x, oy + pr.y, pr.radius * 1.9, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = pr.color;
+        ctx.beginPath(); ctx.arc(ox + pr.x, oy + pr.y, pr.radius, 0, Math.PI * 2); ctx.fill();
+      }
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
       ctx.beginPath(); ctx.arc(ox + pr.x, oy + pr.y, pr.radius * 0.45, 0, Math.PI * 2); ctx.fill();
     }
@@ -590,13 +664,22 @@
       }
       // Status auras.
       if (p.status && p.status.shielded) {
-        ctx.save();
-        ctx.shadowColor = '#a0e6ff';
-        ctx.shadowBlur = 12;
-        ctx.strokeStyle = 'rgba(160,230,255,0.9)';
-        ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(px, py, r + 6, 0, Math.PI * 2); ctx.stroke();
-        ctx.restore();
+        if (fxMode === 'high') {
+          ctx.save();
+          ctx.shadowColor = '#a0e6ff';
+          ctx.shadowBlur = 12;
+          ctx.strokeStyle = 'rgba(160,230,255,0.9)';
+          ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(px, py, r + 6, 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
+        } else {
+          ctx.strokeStyle = 'rgba(160,230,255,0.9)';
+          ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(px, py, r + 6, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = 'rgba(160,230,255,0.35)';
+          ctx.lineWidth = 6;
+          ctx.beginPath(); ctx.arc(px, py, r + 8, 0, Math.PI * 2); ctx.stroke();
+        }
       }
       if (p.status && p.status.invulnerable) {
         ctx.strokeStyle = '#ffffff';
@@ -642,18 +725,32 @@
         }
       }
       if (!drewSprite) {
-        const bg = ctx.createRadialGradient(px - r * 0.35, py - r * 0.45, r * 0.1, px, py, r);
-        bg.addColorStop(0, lighten(p.color, 0.5));
-        bg.addColorStop(0.6, p.color);
-        bg.addColorStop(1, darken(p.color, 0.4));
-        ctx.save();
-        if (p.pid === myPid) {
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 16;
+        if (fxMode === 'high') {
+          const bg = ctx.createRadialGradient(px - r * 0.35, py - r * 0.45, r * 0.1, px, py, r);
+          bg.addColorStop(0, lighten(p.color, 0.5));
+          bg.addColorStop(0.6, p.color);
+          bg.addColorStop(1, darken(p.color, 0.4));
+          ctx.save();
+          if (p.pid === myPid) {
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 16;
+          }
+          ctx.fillStyle = bg;
+          ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        } else {
+          // Flat fill with a small inner highlight — no per-frame gradient.
+          ctx.fillStyle = p.color;
+          ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.18)';
+          ctx.beginPath(); ctx.arc(px - r * 0.35, py - r * 0.4, r * 0.45, 0, Math.PI * 2); ctx.fill();
+          if (p.pid === myPid) {
+            // Cheap "this is you" highlight: extra outline ring.
+            ctx.strokeStyle = lighten(p.color, 0.5);
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(px, py, r + 2, 0, Math.PI * 2); ctx.stroke();
+          }
         }
-        ctx.fillStyle = bg;
-        ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
 
         // Outline ring.
         ctx.strokeStyle = 'rgba(255,255,255,0.18)';
@@ -664,12 +761,19 @@
       // Hit flash overlay.
       if (flashes[p.pid] && now < flashes[p.pid]) {
         const k = (flashes[p.pid] - now) / 260;
-        ctx.save();
-        ctx.shadowColor = '#ff3030';
-        ctx.shadowBlur = 18 * k;
-        ctx.fillStyle = `rgba(255, 80, 80, ${0.65 * k})`;
-        ctx.beginPath(); ctx.arc(px, py, r * 1.05, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
+        if (fxMode === 'high') {
+          ctx.save();
+          ctx.shadowColor = '#ff3030';
+          ctx.shadowBlur = 18 * k;
+          ctx.fillStyle = `rgba(255, 80, 80, ${0.65 * k})`;
+          ctx.beginPath(); ctx.arc(px, py, r * 1.05, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        } else {
+          ctx.fillStyle = `rgba(255, 80, 80, ${0.65 * k})`;
+          ctx.beginPath(); ctx.arc(px, py, r * 1.05, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = `rgba(255, 80, 80, ${0.25 * k})`;
+          ctx.beginPath(); ctx.arc(px, py, r * 1.5, 0, Math.PI * 2); ctx.fill();
+        }
       } else if (flashes[p.pid]) { delete flashes[p.pid]; }
 
       // Sprint dust (cheap).
