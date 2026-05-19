@@ -217,7 +217,7 @@ def test_melee_only_hits_in_cone():
 def test_dot_damages_over_time():
     g = GameState()
     a = g.add_player("a", make_manifest(
-        power_damage=1, extra_effects=[{"effect": "dot", "dps": 20, "durationMs": 1000}],
+        power_damage=1, extra_effects=[{"effect": "dot", "dps": 15, "durationMs": 1000}],
     ))
     t = g.add_player("t", make_manifest(hp=100))
     a.x, a.y = 100, 200; a.facing_x, a.facing_y = 1, 0

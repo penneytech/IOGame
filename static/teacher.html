@@ -42,7 +42,9 @@
         </label>
       </div>
       <div style="margin-top:10px;">
-        <button id="botsBtn" class="tbtn" type="button" onclick="toggleBots()">Spawn 20 demo bots</button>
+        <label>Bots: <input id="botCount" type="number" min="1" max="50" value="10" style="width:55px"></label>
+        <label style="margin-left:10px;">Hunt player (username): <input id="huntName" type="text" placeholder="e.g. paul" style="width:120px"></label>
+        <button id="botsBtn" class="tbtn" type="button" onclick="toggleBots()" style="margin-left:10px;">Spawn bots</button>
         <span id="botsStatus" style="color:var(--muted); font-size:13px; margin-left:8px;"></span>
         <span style="color:var(--muted); font-size:12px; margin-left:8px;">
           (open <a href="/spectator" target="_blank">/spectator</a> to watch)
@@ -108,9 +110,13 @@
 
     let botsRunning = false;
     async function toggleBots() {
-      const path = botsRunning ? 'stop_bots' : 'spawn_bots';
-      await api(path);
-      // refresh() will pick up the new status
+      if (botsRunning) {
+        await api('stop_bots');
+      } else {
+        const count = parseInt(document.getElementById('botCount').value, 10) || 10;
+        const huntUsername = document.getElementById('huntName').value.trim();
+        await api('spawn_bots', {count, huntUsername});
+      }
     }
     async function refreshBotsStatus() {
       try {
@@ -121,11 +127,11 @@
         const btn = document.getElementById('botsBtn');
         const stat = document.getElementById('botsStatus');
         if (botsRunning) {
-          btn.textContent = 'Stop demo bots';
+          btn.textContent = 'Stop bots';
           btn.classList.add('danger');
           stat.textContent = `${j.count} bots fighting`;
         } else {
-          btn.textContent = 'Spawn 20 demo bots';
+          btn.textContent = 'Spawn bots';
           btn.classList.remove('danger');
           stat.textContent = '';
         }

@@ -30,6 +30,11 @@
 <body>
   <main class="page manual">
     <h1>Power Manual</h1>
+    <p style="background:#1c2230;border:1px solid #2a3140;padding:8px 12px;border-radius:6px;">
+       New to all this? Start with the
+       <a href="/lessons"><strong>step-by-step Lessons</strong></a> &mdash;
+       six short pages that walk you through building your first character.
+    </p>
     <p>Your character lives in <code>character.py</code>. You write a function
        <code>build_character()</code> that returns a dictionary. Inside
        <code>powers</code> is a list of power dicts, and every power has the
@@ -286,6 +291,44 @@
     </ul>
     <p>So you really cannot make a character that has max HP, max speed, max
        damage, and instant cooldowns. The system forces tradeoffs.</p>
+
+    <h3>Exact cost formulas</h3>
+    <p>The breakdown your editor shows comes from these numbers. Tweak any
+       single value and watch your total move. (You CAN gut everything and pour
+       the entire 100 points into one stat — the game lets you.)</p>
+    <table>
+      <thead><tr><th>Thing</th><th>Cost</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Health above 80</td><td>1 pt per +4 HP</td><td>Going from 80 → 200 costs 30 pts.</td></tr>
+        <tr><td>Speed above 180</td><td>1 pt per +4 speed</td><td>Going from 180 → 280 costs 25 pts.</td></tr>
+        <tr><td>Size below 32</td><td>1 pt per −0.8 size</td><td>Tiny hitboxes are now more expensive.</td></tr>
+        <tr><td>Extra power slot</td><td>4 pts each</td><td>First power is free; 2nd is +4, 3rd is +8…</td></tr>
+        <tr><td>Damage effect</td><td>amount ÷ 3</td><td>30 damage on hit = 10 pts before cooldown.</td></tr>
+        <tr><td>DoT effect</td><td>dps ÷ 3 + 3 × seconds</td><td>10 dps for 2s = 9.3 pts.</td></tr>
+        <tr><td>Slow effect</td><td>(1 − factor) × 10 + 3.5 × seconds</td><td>50% slow for 2s = 12 pts.</td></tr>
+        <tr><td>Stun effect</td><td>22 × seconds</td><td>0.5s stun = 11 pts (it's the strongest CC).</td></tr>
+        <tr><td>Knockback effect</td><td>strength ÷ 35</td><td>350 strength = 10 pts.</td></tr>
+        <tr><td>Heal effect</td><td>amount ÷ 4</td><td>40 heal = 10 pts.</td></tr>
+        <tr><td>Projectile cast</td><td>count × (effects + speed×life/200 + radius/6 + speed surcharge)</td><td>+6 pts if pierce. Fast shots cost extra.</td></tr>
+        <tr><td>Area cast</td><td>radius²/600 + duration × ticks/s × effects × 0.7</td><td>Big firewalls cost a lot.</td></tr>
+        <tr><td>Melee cast</td><td>range/15 + arc/45 + effects × 1.2</td><td>Cheap, but you have to be in their face.</td></tr>
+        <tr><td>Dash cast</td><td>distance/40 (+8 if invuln)</td><td>Iframe dashes cost a flat +8.</td></tr>
+        <tr><td>Shield cast</td><td>amount/8 + seconds</td><td>Absorbs damage before HP.</td></tr>
+        <tr><td>Heal cast</td><td>amount/8</td><td>Self-heal, no DoT.</td></tr>
+        <tr><td>Cooldown factor</td><td>1500 / cooldownMs, clamped to [0.4, 6.0]</td><td>Multiply the cast cost by this. 250ms CD = 6×.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>How effects interact (the hierarchy)</h3>
+    <ul>
+      <li><strong>Shield first, then HP.</strong> Damage is absorbed by an active shield until it breaks; only the leftover comes off HP.</li>
+      <li><strong>Heal stacks with shield</strong> — they don't interact. Healing only refills HP, never shield.</li>
+      <li><strong>DoTs from the same source refresh, they don't stack.</strong> If you tag someone with a 6dps/2s DoT and re-tag them 0.5s later, you don't get 12 dps — you keep 6 dps and the timer resets. DoTs from <em>different</em> attackers stack normally.</li>
+      <li><strong>Slow takes the strongest active.</strong> Two overlapping slows: the lower factor wins (more slow), and the longer duration wins. Slow doesn't stack to 0.</li>
+      <li><strong>Stun overrides movement entirely.</strong> A stunned target can't move or cast. Multiple stuns just refresh to the longest.</li>
+      <li><strong>Knockback is a velocity impulse.</strong> It pushes you, then friction slows you back down. Bigger strength = farther push.</li>
+      <li><strong>Dash invulnerability beats everything</strong> for its duration — even DoT ticks land on 0.</li>
+    </ul>
 
     <h2>Class archetypes</h2>
     <p>These are <em>shapes</em>, not rules. Build whatever you want — but

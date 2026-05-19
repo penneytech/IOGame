@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in · Classroom IO Game</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <style>
+    body.login-body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(120, 90, 200, 0.25), transparent 60%),
+        radial-gradient(circle at 80% 75%, rgba(255, 130, 60, 0.2), transparent 55%),
+        #0a0c18;
+    }
+    .login-card {
+      background: rgba(20, 24, 44, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 32px 36px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      width: min(380px, 92vw);
+      backdrop-filter: blur(8px);
+    }
+    .login-card h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      color: var(--accent, #ffb13b);
+    }
+    .login-card p { color: #a8aec5; font-size: 13px; margin: 0 0 20px; }
+    .login-card label { display: block; font-size: 12px; color: #c9cee3; margin-bottom: 6px; }
+    .login-card input[type=password] {
+      width: 100%;
+      padding: 11px 12px;
+      background: #0b0d15;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f0f3ff;
+      border-radius: 8px;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+    .login-card input[type=password]:focus {
+      outline: none;
+      border-color: var(--accent, #ffb13b);
+    }
+    .login-card button {
+      margin-top: 16px;
+      width: 100%;
+      padding: 11px;
+      background: var(--accent, #ffb13b);
+      color: #1a1305;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    .login-card button[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .login-msg { margin-top: 14px; font-size: 13px; min-height: 18px; }
+    .login-msg.err { color: #ff7a7a; }
+    .login-msg.ok { color: #7affad; }
+    .login-meta { margin-top: 10px; font-size: 11px; color: #6b7191; text-align: center; }
+  </style>
+</head>
+<body class="login-body">
+  <form class="login-card" id="loginForm" autocomplete="off">
+    <h1>Classroom IO Game</h1>
+    <p>Enter the site password to continue.</p>
+    <label for="pw">Password</label>
+    <input type="password" id="pw" name="password" autocomplete="current-password" required autofocus />
+    <button type="submit" id="submitBtn">Enter</button>
+    <div class="login-msg" id="msg"></div>
+    <div class="login-meta">5 failed attempts triggers a 15-minute lockout.</div>
+  </form>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const next = params.get('next') || '/';
+    const form = document.getElementById('loginForm');
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('submitBtn');
+    const pw = document.getElementById('pw');
+
+    function setMsg(text, cls) {
+      msg.textContent = text;
+      msg.className = 'login-msg ' + (cls || '');
+    }
+    function lockUI(seconds) {
+      btn.disabled = true;
+      pw.disabled = true;
+      const tick = () => {
+        if (seconds <= 0) {
+          btn.disabled = false; pw.disabled = false;
+          setMsg('You may try again.', '');
+          return;
+        }
+        const m = Math.floor(seconds / 60);
+        const s = String(seconds % 60).padStart(2, '0');
+        setMsg(`Locked. Try again in ${m}:${s}.`, 'err');
+        seconds--;
+        setTimeout(tick, 1000);
+      };
+      tick();
+    }
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      btn.disabled = true;
+      setMsg('Checking…', '');
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pw.value }),
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          setMsg('Welcome.', 'ok');
+          setTimeout(() => { location.href = next; }, 200);
+          return;
+        }
+        if (res.status === 429 && data.lockedSeconds) {
+          lockUI(Math.ceil(data.lockedSeconds));
+          return;
+        }
+        const left = data.attemptsRemaining;
+        const tail = (left !== undefined) ? ` (${left} ${left === 1 ? 'try' : 'tries'} left)` : '';
+        setMsg('Wrong password.' + tail, 'err');
+        btn.disabled = false;
+        pw.select();
+      } catch (e) {
+        setMsg('Network error. Try again.', 'err');
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -141,146 +141,9 @@ def _heal(name, key, color, amount, *, cd=5000):
 # 20 bots covering every cast kind + every effect kind, plus edge cases.
 # ---------------------------------------------------------------------------
 
-BOT_MANIFESTS: list[dict[str, Any]] = [
-    {"characterName": "Ranger", "color": "green", "size": 20, "speed": 260,
-     "maxHealth": 100, "powers": [_proj("Arrow", "space", "green", 16, cd=500, speed=600)]},
-    {"characterName": "Pyromancer", "color": "#ff6a3d", "size": 22, "speed": 230, "maxHealth": 90,
-     "powers": [
-         _proj("Fireball", "space", "orange", 11, cd=800, count=2, spread=14,
-               extra=[{"effect": "dot", "dps": 8, "durationMs": 1200}]),
-         _area("Firewall", "q", "red", radius=55, dur=2500,
-               ontick=[{"effect": "damage", "amount": 5},
-                       {"effect": "dot", "dps": 5, "durationMs": 800}]),
-         _dash("Phase Step", "f", "white"),
-     ]},
-    {"characterName": "IceTank", "color": "#9ad3ff", "size": 32, "speed": 170, "maxHealth": 220,
-     "powers": [
-         _proj("Frost Bolt", "space", "#9ad3ff", 12, speed=420,
-               extra=[{"effect": "slow", "factor": 0.4, "durationMs": 1500}]),
-         _melee("Cleave", "q", "blue", cd=1100, rng=80, arc=120,
-                onhit=[{"effect": "damage", "amount": 22},
-                       {"effect": "knockback", "strength": 220}]),
-         _shield("Bulwark", "e", "cyan", 80, dur=4000),
-     ]},
-    {"characterName": "Rogue", "color": "#a070ff", "size": 18, "speed": 320, "maxHealth": 80,
-     "powers": [
-         _proj("Knife", "space", "white", 10, cd=350, speed=700, pierce=True),
-         _melee("Backstab", "q", "purple", cd=1500, rng=55, arc=60,
-                onhit=[{"effect": "damage", "amount": 28},
-                       {"effect": "stun", "durationMs": 250}]),
-         _dash("Blink", "f", "#a070ff", dist=240),
-     ]},
-    {"characterName": "Medic", "color": "lime", "size": 24, "speed": 250, "maxHealth": 120,
-     "powers": [
-         _proj("Dart", "space", "white", 10, cd=600, speed=520),
-         _heal("Mend", "e", "lime", 60),
-         _area("Regen Pool", "q", "green", cd=7000, radius=80, dur=4000, tick=400, follow=True,
-               ontick=[{"effect": "heal", "amount": 6}]),
-     ]},
-    {"characterName": "Paladin", "color": "#ffcb47", "size": 28, "speed": 200, "maxHealth": 180,
-     "powers": [
-         _melee("Smite", "space", "yellow", cd=900, rng=70,
-                onhit=[{"effect": "damage", "amount": 20},
-                       {"effect": "knockback", "strength": 150}]),
-         _shield("Bastion", "e", "gold", 60, dur=5000),
-         _heal("LayOnHands", "q", "white", 50, cd=8000),
-     ]},
-    {"characterName": "Bomber", "color": "#2a6b1a", "size": 26, "speed": 210, "maxHealth": 110,
-     "powers": [
-         _proj("Grenade", "space", "#2a6b1a", 22, cd=900, speed=380, radius=8,
-               extra=[{"effect": "knockback", "strength": 280}]),
-         _area("Poison Cloud", "q", "purple", cd=5000, radius=100, dur=3000, tick=300,
-               ontick=[{"effect": "damage", "amount": 5},
-                       {"effect": "slow", "factor": 0.6, "durationMs": 800}]),
-         _dash("Roll Away", "f", "white", dist=180),
-     ]},
-    {"characterName": "Berserker", "color": "maroon", "size": 26, "speed": 240, "maxHealth": 140,
-     "powers": [
-         _melee("Slash", "space", "red", cd=550, rng=65, arc=80,
-                onhit=[{"effect": "damage", "amount": 16}]),
-         _melee("Reaver", "q", "orange", cd=1800, rng=80, arc=140,
-                onhit=[{"effect": "damage", "amount": 18},
-                       {"effect": "dot", "dps": 12, "durationMs": 2000},
-                       {"effect": "knockback", "strength": 100}]),
-     ]},
-    {"characterName": "Sniper", "color": "navy", "size": 18, "speed": 200, "maxHealth": 70,
-     "powers": [
-         _proj("Snipe", "space", "yellow", 40, cd=2200, speed=900, pierce=True, radius=4),
-         _dash("Reposition", "f", "white", dist=160),
-     ]},
-    {"characterName": "Shotgunner", "color": "brown", "size": 24, "speed": 230, "maxHealth": 110,
-     "powers": [
-         _proj("Buckshot", "space", "yellow", 7, cd=900, speed=520, count=6, spread=45,
-               lifetime=600),
-     ]},
-    {"characterName": "Stunner", "color": "teal", "size": 22, "speed": 220, "maxHealth": 100,
-     "powers": [
-         _proj("Bolt", "space", "cyan", 8, cd=500),
-         _area("Net", "q", "white", cd=6000, radius=90, dur=1200, tick=400,
-               ontick=[{"effect": "stun", "durationMs": 250}]),
-     ]},
-    {"characterName": "Cleric", "color": "white", "size": 24, "speed": 240, "maxHealth": 120,
-     "powers": [
-         _proj("Light", "space", "white", 6, cd=400),
-         _heal("Bless", "e", "white", 40, cd=4000),
-     ]},
-    {"characterName": "Bruiser", "color": "silver", "size": 28, "speed": 220, "maxHealth": 150,
-     "powers": [
-         _melee("Hammer", "space", "silver", cd=1100, rng=75,
-                onhit=[{"effect": "damage", "amount": 18},
-                       {"effect": "knockback", "strength": 350}]),
-         _shield("Wall", "e", "gray", 50, dur=3000),
-     ]},
-    {"characterName": "Harasser", "color": "pink", "size": 16, "speed": 340, "maxHealth": 70,
-     "powers": [
-         _proj("Needle", "space", "pink", 5, cd=200, speed=700, radius=3, pierce=True),
-     ]},
-    {"characterName": "Stormcaller", "color": "blue", "size": 22, "speed": 220, "maxHealth": 90,
-     "powers": [
-         _area("Storm", "space", "cyan", cd=2200, radius=70, dur=1800, tick=300,
-               ontick=[{"effect": "damage", "amount": 7}]),
-         _area("Hail", "q", "white", cd=4000, radius=110, dur=2400, tick=400,
-               ontick=[{"effect": "damage", "amount": 5},
-                       {"effect": "slow", "factor": 0.7, "durationMs": 600}]),
-     ]},
-    {"characterName": "Hexer", "color": "magenta", "size": 22, "speed": 230, "maxHealth": 100,
-     "powers": [
-         _proj("Curse", "space", "magenta", 8, cd=600,
-               extra=[{"effect": "slow", "factor": 0.6, "durationMs": 1200},
-                      {"effect": "dot", "dps": 8, "durationMs": 1500}]),
-         _melee("Rebuke", "q", "purple", cd=1500, rng=60, arc=100,
-                onhit=[{"effect": "damage", "amount": 14},
-                       {"effect": "stun", "durationMs": 300},
-                       {"effect": "knockback", "strength": 180}]),
-         _heal("Sip", "e", "lime", 30, cd=6000),
-     ]},
-    {"characterName": "Phantom", "color": "white", "size": 18, "speed": 300, "maxHealth": 80,
-     "powers": [
-         _melee("Strike", "space", "white", cd=600, rng=55,
-                onhit=[{"effect": "damage", "amount": 14}]),
-         _dash("Dash A", "f", "white", dist=240, cd=2200),
-         _dash("Dash B", "q", "cyan", dist=140, cd=1400, invuln=False),
-     ]},
-    {"characterName": "Cannoneer", "color": "gold", "size": 26, "speed": 200, "maxHealth": 130,
-     "powers": [
-         _proj("Cannon", "space", "gold", 28, cd=1800, speed=400, radius=9,
-               extra=[{"effect": "stun", "durationMs": 350},
-                      {"effect": "knockback", "strength": 200}]),
-     ]},
-    {"characterName": "GlassCannon", "color": "red", "size": 14, "speed": 280, "maxHealth": 50,
-     "powers": [
-         _proj("Lance", "space", "red", 30, cd=1200, speed=750, pierce=True),
-         _dash("Vanish", "f", "white", dist=220),
-     ]},
-    {"characterName": "Druid", "color": "lime", "size": 24, "speed": 230, "maxHealth": 130,
-     "powers": [
-         _proj("Thorn", "space", "green", 9, cd=450,
-               extra=[{"effect": "slow", "factor": 0.7, "durationMs": 800}]),
-         _area("Grove", "q", "lime", cd=8000, radius=90, dur=4000, tick=500, follow=True,
-               ontick=[{"effect": "heal", "amount": 5}]),
-         _shield("Bark", "e", "brown", 40, dur=3500),
-     ]},
-]
+from server._internal.data import load as _load_bots
+BOT_MANIFESTS: list[dict[str, Any]] = _load_bots()
+
 
 
 def build_manifests() -> list[CharacterManifest]:
@@ -395,6 +258,13 @@ def _nearest_ally(game: GameState, me) -> Any:
 
 def _pick_target(game: GameState, me, st: dict) -> Any:
     """Focus-fire: prefer current target if still valid + low HP, else lowest HP in range."""
+    # Hunt-mode override: lock onto the configured target if alive.
+    hunt_pid = getattr(game, "bot_hunt_pid", "") or ""
+    if hunt_pid:
+        hp = game.players.get(hunt_pid)
+        if hp is not None and hp.alive and not hp.eliminated and hp.pid != me.pid:
+            st["target_pid"] = hp.pid
+            return hp
     candidates = []
     for other in game.players.values():
         if other.pid == me.pid or not other.alive or other.eliminated:
@@ -806,6 +676,9 @@ class LiveBotSwarm:
         self._task: asyncio.Task | None = None
         self._pids: list[str] = []
         self._rng = random.Random(0)
+        # Optional hunt target — when set, every bot prioritises this pid.
+        if not hasattr(game, "bot_hunt_pid"):
+            game.bot_hunt_pid = ""
 
     @property
     def running(self) -> bool:
@@ -815,9 +688,23 @@ class LiveBotSwarm:
     def count(self) -> int:
         return sum(1 for pid in self._pids if pid in self.game.players)
 
-    def spawn(self) -> int:
-        """Add all bots to the game. Returns the number spawned."""
-        for spec in BOT_MANIFESTS:
+    def spawn(self, count: int | None = None) -> int:
+        """Add bots to the game. Returns the number spawned.
+
+        If ``count`` is given, draws that many manifests (cycling if needed).
+        Otherwise spawns the full BOT_MANIFESTS roster.
+        """
+        if count is None:
+            specs = list(BOT_MANIFESTS)
+        else:
+            count = max(1, min(int(count), 50))
+            specs = [BOT_MANIFESTS[i % len(BOT_MANIFESTS)] for i in range(count)]
+        # Slow bots by 30% globally so they're easier for students to handle.
+        BOT_SPEED_MULT = 0.7
+        for original in specs:
+            spec = dict(original)
+            if "speed" in spec:
+                spec["speed"] = max(20, int(round(spec["speed"] * BOT_SPEED_MULT)))
             manifest = CharacterManifest.model_validate(spec)
             p = self.game.add_player(self.BOT_PREFIX + spec["characterName"], manifest)
             self._pids.append(p.pid)
@@ -896,4 +783,5 @@ class LiveBotSwarm:
             except (asyncio.CancelledError, Exception):
                 pass
             self._task = None
+        self.game.bot_hunt_pid = ""
         return self.remove()

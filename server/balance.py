@@ -31,7 +31,7 @@ SPEED_BASELINE = 180.0
 SPEED_PER_PT = 4.0
 
 SIZE_BASELINE = 32.0      # bigger than this is free
-SIZE_PER_PT = 1.5         # smaller costs
+SIZE_PER_PT = 0.8         # smaller costs more (was 1.5 — small chars were too cheap)
 
 EXTRA_POWER_COST = 4.0    # first power free, then 4pts each
 
@@ -39,7 +39,7 @@ EXTRA_POWER_COST = 4.0    # first power free, then 4pts each
 # long CDs make it cheap. Clamped so it can't go to zero or infinity.
 COOLDOWN_REF_MS = 1500.0
 COOLDOWN_FACTOR_MIN = 0.4
-COOLDOWN_FACTOR_MAX = 4.0
+COOLDOWN_FACTOR_MAX = 6.0  # was 4.0 — short-CD spam now costs more
 
 # Single-power warning threshold.
 HOT_POWER_COST = 25.0
@@ -54,17 +54,20 @@ def cost_effect(eff: dict) -> float:
     """Cost of a single effect dict (already validated by Pydantic)."""
     kind = eff.get("effect")
     if kind == "damage":
-        return float(eff["amount"]) / 3.5
+        return float(eff["amount"]) / 3.0   # was /3.5 — raw damage slightly pricier
     if kind == "heal":
         return float(eff["amount"]) / 4.0
     if kind == "slow":
-        return (1.0 - float(eff["factor"])) * 6.0 + (float(eff["durationMs"]) / 1000.0) * 2.0
+        # Strength matters a LOT and duration is what makes slow oppressive.
+        return (1.0 - float(eff["factor"])) * 10.0 + (float(eff["durationMs"]) / 1000.0) * 3.5
     if kind == "stun":
-        return (float(eff["durationMs"]) / 1000.0) * 14.0
+        # Stun is the strongest CC: full lockout. Make it expensive per ms.
+        return (float(eff["durationMs"]) / 1000.0) * 22.0
     if kind == "knockback":
-        return float(eff["strength"]) / 60.0
+        return float(eff["strength"]) / 35.0  # was /60 — KB now actually pushes
     if kind == "dot":
-        return float(eff["dps"]) / 3.0 + (float(eff["durationMs"]) / 1000.0) * 1.5
+        # Duration is what makes DOTs scary (we now refresh-not-stack), so price it.
+        return float(eff["dps"]) / 3.0 + (float(eff["durationMs"]) / 1000.0) * 3.0
     return 0.0
 
 
@@ -81,17 +84,22 @@ def cost_cast(cast_dict: dict) -> float:
         lifetime_s = float(cast_dict["lifetimeMs"]) / 1000.0
         radius = float(cast_dict["radius"])
         count = int(cast_dict.get("count", 1))
+        # Range score (how much area the shot covers) + explicit speed surcharge
+        # so fireball-style fast projectiles cost real points.
         range_score = (speed * lifetime_s) / 200.0 + radius / 6.0
-        cost = count * (eff_sum + range_score)
+        speed_surcharge = max(0.0, (speed - 350.0) / 80.0)  # 0 at speed<=350, ramps up
+        cost = count * (eff_sum + range_score + speed_surcharge)
         if cast_dict.get("pierce"):
-            cost += 3.0
+            cost += 6.0  # was 3 — pierce is huge in crowded fights
         return cost
     if kind == "area":
         eff_sum = _sum_effects(cast_dict.get("onTick", []))
         radius = float(cast_dict["radius"])
         duration_s = float(cast_dict["durationMs"]) / 1000.0
         ticks_per_s = 1000.0 / max(50.0, float(cast_dict.get("tickIntervalMs", 250)))
-        return radius / 12.0 + duration_s * ticks_per_s * eff_sum * 0.5
+        # Radius cost is quadratic-ish so giant firewalls aren't cheap.
+        area_score = (radius * radius) / 600.0
+        return area_score + duration_s * ticks_per_s * eff_sum * 0.7
     if kind == "melee":
         eff_sum = _sum_effects(cast_dict.get("onHit", []))
         return float(cast_dict["range"]) / 15.0 + float(cast_dict["arcDeg"]) / 45.0 + eff_sum * 1.2

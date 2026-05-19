@@ -25,28 +25,16 @@
       <p>Edit the JavaScript below. Your <code>buildCharacter()</code> function
          must return an object describing your character. Click
          <strong>Run &amp; Validate</strong>, then <strong>Join Game</strong>.</p>
-      <p>New here? Read the <a href="/manual">Power Manual</a> first — it lists
-         every cast kind and effect with examples. Try a
-         <a href="/challenges">challenge card</a> for inspiration.</p>
+      <p>New here? Read the <a href="/lessons">Lessons</a> for a step-by-step
+         walkthrough, or skim the <a href="/manual">Power Manual</a> for every
+         cast kind and effect. Try a <a href="/challenges">challenge card</a>
+         for inspiration.</p>
     </div>
 
     <div class="editor-grid">
       <section class="panel">
         <label for="username">Your name</label>
         <input id="username" type="text" maxlength="24" placeholder="e.g. ada" />
-
-        <label for="example">Load example</label>
-        <div class="row example-row">
-          <select id="example">
-            <option value="boilerplate">Medic (boilerplate — start here)</option>
-            <option value="fire_wizard">Fire Wizard — projectile + area DoT</option>
-            <option value="ice_tank">Ice Tank — shield + melee + slow</option>
-            <option value="rogue">Rogue — dash + backstab</option>
-            <option value="paladin">Paladin — shield + heal + melee</option>
-            <option value="bomber">Bomber — grenade + poison cloud</option>
-          </select>
-          <button type="button" id="loadExampleBtn" class="btn-secondary">Load</button>
-        </div>
 
         <label for="code">character.py <span class="py-status" id="pyStatus">⊙ loading Python…</span></label>
         <textarea id="code" spellcheck="false" placeholder="# Define a function called build_character() that returns a dict."></textarea>
@@ -61,16 +49,12 @@
         <details class="sprite-import" open>
           <summary>🎨 Pixel art (PiskelApp)</summary>
           <div class="sprite-help">
+            <p style="margin:0 0 6px 0;font-size:12px;color:#9aa;">
+              Export your animation from <a href="https://www.piskelapp.com/" target="_blank" rel="noopener">PiskelApp</a>
+              as a <strong>.c</strong> file, then drop it here. It becomes your walk animation.
+            </p>
             <div class="sprite-row">
-              <label class="sprite-pick">
-                <span>Slot:</span>
-                <select id="spriteSlot">
-                  <option value="walk" selected>walk</option>
-                  <option value="attack">attack</option>
-                  <option value="hurt">hurt</option>
-                </select>
-              </label>
-              <input id="spriteFile" type="file" accept="image/png,image/gif,.c,text/plain" multiple />
+              <input id="spriteFile" type="file" accept=".c,text/plain" />
             </div>
             <div id="spritePreview" class="sprite-preview" hidden></div>
             <pre id="spriteOut" class="sprite-out" hidden></pre>
@@ -84,7 +68,7 @@
         <div class="row">
           <button id="runBtn" type="button">Run &amp; Validate</button>
           <button id="joinBtn" type="button" disabled>Join Game</button>
-          <button id="resetBtn" type="button" class="btn-secondary" title="Reload the Python boilerplate">Reset</button>
+          <button id="resetBtn" type="button" class="btn-secondary" title="Clear the editor">Clear</button>
         </div>
       </section>
 

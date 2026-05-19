@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lessons · Classroom IO Game</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    body { background: #0e1116; color: #e6e6e6; font-family: ui-sans-serif, system-ui, sans-serif; }
+    main.lesson-page { max-width: 820px; margin: 24px auto; padding: 0 20px 80px; }
+    .lesson-nav { margin-bottom: 18px; font-size: 14px; }
+    .lesson-nav a { color: #6cf; margin-right: 12px; }
+    article#lessonContent h1 { border-bottom: 1px solid #2a3140; padding-bottom: 6px; margin-top: 24px; }
+    article#lessonContent h2 { margin-top: 28px; color: #ffd070; }
+    article#lessonContent h3 { color: #aee; }
+    article#lessonContent pre { background: #161b22; padding: 12px 14px; border-radius: 6px; overflow-x: auto; border: 1px solid #2a3140; }
+    article#lessonContent code { background: #1c2230; padding: 1px 5px; border-radius: 3px; }
+    article#lessonContent pre code { background: transparent; padding: 0; }
+    article#lessonContent table { border-collapse: collapse; margin: 12px 0; }
+    article#lessonContent th, article#lessonContent td { border: 1px solid #2a3140; padding: 6px 10px; text-align: left; }
+    article#lessonContent th { background: #1c2230; }
+    article#lessonContent blockquote { border-left: 3px solid #ffd070; margin: 12px 0; padding: 4px 14px; color: #c9c9c9; background: #161b22; }
+    article#lessonContent a { color: #6cf; }
+    .lesson-footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #2a3140; display: flex; justify-content: space-between; font-size: 14px; }
+    .lesson-toc { background: #161b22; border: 1px solid #2a3140; border-radius: 6px; padding: 10px 18px; margin-bottom: 18px; }
+    .lesson-toc ol { margin: 6px 0; padding-left: 22px; }
+    .err { color: #ff8888; }
+  </style>
+</head>
+<body>
+  <main class="lesson-page">
+    <nav class="lesson-nav">
+      <a href="/">← Home</a>
+      <a href="/student">Editor</a>
+      <a href="/manual">Power Manual</a>
+      <a href="/lessons">Lessons home</a>
+    </nav>
+    <article id="lessonContent">Loading…</article>
+    <div class="lesson-footer">
+      <span id="prevLink"></span>
+      <span id="nextLink"></span>
+    </div>
+  </main>
+
+  <!-- Tiny markdown-to-HTML using marked from a CDN (cached, ~30KB) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    const ORDER = [
+      'README.md',
+      '01-make-one.md',
+      '02-add-a-power.md',
+      '03-budget.md',
+      '04-your-own.md',
+      '05-your-own-drawing.md',
+    ];
+    function fileFromHash() {
+      const h = (location.hash || '').replace(/^#\/?/, '');
+      if (!h) return 'README.md';
+      const name = decodeURIComponent(h);
+      return ORDER.includes(name) ? name : 'README.md';
+    }
+    async function load() {
+      const name = fileFromHash();
+      const el = document.getElementById('lessonContent');
+      el.textContent = 'Loading ' + name + '…';
+      try {
+        const r = await fetch('/lessons/' + encodeURIComponent(name));
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const md = await r.text();
+        // Rewrite relative .md links so they stay inside this viewer.
+        const rewritten = md.replace(/\]\(([^)]+\.md)\)/g, (_, p1) => `](#/${p1})`);
+        el.innerHTML = marked.parse(rewritten);
+      } catch (e) {
+        el.innerHTML = '<p class="err">Could not load lesson: ' + e.message + '</p>';
+      }
+      // Prev/next links.
+      const idx = ORDER.indexOf(name);
+      const prev = document.getElementById('prevLink');
+      const next = document.getElementById('nextLink');
+      prev.innerHTML = idx > 0 ? `<a href="#/${ORDER[idx-1]}">← ${ORDER[idx-1]}</a>` : '';
+      next.innerHTML = (idx >= 0 && idx < ORDER.length - 1) ? `<a href="#/${ORDER[idx+1]}">${ORDER[idx+1]} →</a>` : '';
+      // Scroll to top on load.
+      window.scrollTo(0, 0);
+    }
+    window.addEventListener('hashchange', load);
+    load();
+  </script>
+</body>
+</html>

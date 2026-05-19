@@ -1,0 +1,24 @@
+{
+  "name": "Classroom IO Game",
+  "description": "Code your character. Battle your classmates.",
+  "stack": "heroku-22",
+  "buildpacks": [{ "url": "heroku/python" }],
+  "env": {
+    "SITE_PASSWORD": {
+      "description": "Site-wide gate password.",
+      "value": "Nelson"
+    },
+    "TEACHER_TOKEN": {
+      "description": "Teacher dashboard token. Leave blank to auto-generate (printed in dyno logs).",
+      "required": false
+    },
+    "SITE_AUTH_SECRET": {
+      "description": "HMAC secret for the auth cookie. Auto-generated if blank.",
+      "generator": "secret",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": { "quantity": 1, "size": "basic" }
+  }
+}

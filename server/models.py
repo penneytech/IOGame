@@ -29,19 +29,19 @@ from pydantic import BaseModel, Field, field_validator
 NAME_MAX_LEN = 24
 
 MAX_HEALTH_RANGE = (10, 300)
-SIZE_RANGE = (8, 60)
+SIZE_RANGE = (12, 60)                  # min raised: tiny hitboxes were too strong
 SPEED_RANGE = (40, 500)
 
-DAMAGE_RANGE = (1, 60)
+DAMAGE_RANGE = (1, 60)                 # cap unchanged — balance.py prices it harder
 HEAL_RANGE = (1, 80)
 SLOW_FACTOR_RANGE = (0.1, 0.95)        # multiplier on movement speed
 STATUS_DURATION_RANGE_MS = (100, 6000)
 STUN_DURATION_RANGE_MS = (100, 2000)
 KNOCKBACK_RANGE = (50, 600)
-DOT_DPS_RANGE = (1, 30)
+DOT_DPS_RANGE = (1, 15)                # was 30 — 30dps stacked melted everything
 
 COOLDOWN_RANGE_MS = (150, 15_000)
-PROJECTILE_SPEED_RANGE = (50, 900)
+PROJECTILE_SPEED_RANGE = (50, 700)     # was 900 — fireball-speed got insane
 PROJECTILE_RADIUS_RANGE = (2, 30)
 PROJECTILE_LIFETIME_RANGE_MS = (200, 5000)
 PROJECTILE_COUNT_RANGE = (1, 6)
@@ -57,7 +57,7 @@ DASH_DURATION_RANGE_MS = (80, 600)
 SHIELD_AMOUNT_RANGE = (5, 200)
 SHIELD_DURATION_RANGE_MS = (200, 8000)
 
-MELEE_RANGE_RANGE = (20, 140)
+MELEE_RANGE_RANGE = (20, 200)          # was 140 — backstab needed more reach
 MELEE_ARC_RANGE_DEG = (30.0, 180.0)
 
 MAX_POWERS = 4
@@ -309,6 +309,12 @@ class CharacterManifest(BaseModel):
     _vsp = field_validator("speed")(_ranged("speed", *SPEED_RANGE))
     _vhp = field_validator("maxHealth")(_ranged("maxHealth", *MAX_HEALTH_RANGE))
 
+    @field_validator("characterName")
+    @classmethod
+    def _vname(cls, v: str) -> str:
+        from server.name_filter import check_name
+        return check_name(v.strip())
+
     @field_validator("color")
     @classmethod
     def _vcl(cls, v: str) -> str:
@@ -359,6 +365,8 @@ class JoinRequest(BaseModel):
             raise ValueError("username cannot be blank")
         if not all(ch.isalnum() or ch in "-_ " for ch in v):
             raise ValueError("username may only use letters, digits, space, - or _")
+        from server.name_filter import check_name
+        check_name(v)
         return v
 
 
@@ -370,6 +378,15 @@ _NAMED_COLORS = {
     "red", "orange", "yellow", "green", "blue", "purple", "pink", "white",
     "black", "gray", "grey", "cyan", "magenta", "brown", "lime", "teal",
     "gold", "silver", "navy", "maroon",
+    # extras students reach for — all standard CSS names
+    "crimson", "salmon", "tomato", "coral", "darkred",
+    "darkorange", "khaki", "olive", "darkgreen", "forestgreen",
+    "seagreen", "turquoise", "aqua", "deepskyblue", "skyblue",
+    "dodgerblue", "royalblue", "darkblue", "indigo", "violet",
+    "plum", "orchid", "hotpink", "deeppink", "fuchsia",
+    "tan", "chocolate", "sienna", "beige", "ivory",
+    "wheat", "lavender", "mintcream", "snow", "darkgray", "darkgrey",
+    "lightgray", "lightgrey", "slategray", "slategrey",
 }
 
 

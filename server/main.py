@@ -14,10 +14,21 @@ from typing import Dict
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .auth import (
+    AttemptTracker,
+    COOKIE_NAME,
+    COOKIE_MAX_AGE,
+    PasswordGateMiddleware,
+    client_ip,
+    get_password,
+    get_secret,
+    make_cookie_value,
+    ws_is_authed,
+)
 from .balance import build_report
 from .bot_runner import LiveBotSwarm, set_ai_logging, get_ai_logging_status
 from .game_state import GameState
@@ -38,8 +49,7 @@ from .validation import validate_join, validate_manifest
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = ROOT / "static"
-EXAMPLES_DIR = ROOT / "examples"
-BOILERPLATE_DIR = ROOT / "student_boilerplate"
+LESSONS_DIR = ROOT / "lessons"
 
 TICK_RATE = 30  # Hz
 TICK_DT = 1.0 / TICK_RATE
@@ -74,6 +84,8 @@ def create_app(game: GameState | None = None) -> FastAPI:
                 pass
 
     app = FastAPI(title="Classroom IO Game", lifespan=lifespan)
+    app.add_middleware(PasswordGateMiddleware)
+    app.state.attempt_tracker = AttemptTracker()
     app.state.game = game or GameState()
     app.state.connections: Dict[str, WebSocket] = {}
     app.state.spectators: set[WebSocket] = set()
@@ -96,6 +108,55 @@ def create_app(game: GameState | None = None) -> FastAPI:
     async def index() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")
 
+    # --- Public auth endpoints (excluded from password gate) -----------
+
+    @app.get("/login")
+    async def login_page() -> FileResponse:
+        return FileResponse(STATIC_DIR / "login.html")
+
+    @app.post("/api/login")
+    async def api_login(payload: dict, request: Request) -> JSONResponse:
+        tracker: AttemptTracker = app.state.attempt_tracker
+        ip = client_ip(request)
+        locked, remaining = tracker.is_locked(ip)
+        if locked:
+            return JSONResponse(
+                {"ok": False, "error": "locked", "lockedSeconds": int(remaining)},
+                status_code=429,
+            )
+        submitted = str(payload.get("password", ""))
+        if secrets.compare_digest(submitted, get_password()):
+            tracker.clear(ip)
+            secret = get_secret(app.state)
+            resp = JSONResponse({"ok": True})
+            resp.set_cookie(
+                COOKIE_NAME,
+                make_cookie_value(secret),
+                max_age=COOKIE_MAX_AGE,
+                httponly=True,
+                samesite="lax",
+                secure=request.url.scheme == "https",
+                path="/",
+            )
+            return resp
+        used, locked_for = tracker.record_failure(ip)
+        remaining_tries = max(0, 5 - used)
+        if locked_for:
+            return JSONResponse(
+                {"ok": False, "error": "locked", "lockedSeconds": int(locked_for)},
+                status_code=429,
+            )
+        return JSONResponse(
+            {"ok": False, "error": "wrong", "attemptsRemaining": remaining_tries},
+            status_code=401,
+        )
+
+    @app.post("/api/logout")
+    async def api_logout() -> JSONResponse:
+        resp = JSONResponse({"ok": True})
+        resp.delete_cookie(COOKIE_NAME, path="/")
+        return resp
+
     @app.get("/teacher")
     async def teacher_page() -> FileResponse:
         return FileResponse(STATIC_DIR / "teacher.html")
@@ -115,6 +176,25 @@ def create_app(game: GameState | None = None) -> FastAPI:
     @app.get("/challenges")
     async def challenges_page() -> FileResponse:
         return FileResponse(STATIC_DIR / "challenges.html")
+
+    @app.get("/lessons")
+    @app.get("/lessons/")
+    async def lessons_index() -> FileResponse:
+        # Serve the index as raw markdown wrapped in a tiny HTML viewer.
+        return FileResponse(STATIC_DIR / "lessons.html")
+
+    @app.get("/lessons/{name}")
+    async def lesson_file(name: str):
+        # Only allow plain .md filenames inside the lessons folder.
+        from fastapi import HTTPException
+        if "/" in name or "\\" in name or ".." in name:
+            raise HTTPException(status_code=400, detail="bad name")
+        if not name.endswith(".md"):
+            raise HTTPException(status_code=404, detail="not found")
+        path = LESSONS_DIR / name
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="not found")
+        return FileResponse(path, media_type="text/markdown; charset=utf-8")
 
     @app.get("/spectator")
     async def spectator_page() -> FileResponse:
@@ -223,9 +303,25 @@ def create_app(game: GameState | None = None) -> FastAPI:
         swarm: LiveBotSwarm = app.state.bot_swarm
         if swarm.running:
             return {"ok": True, "running": True, "count": swarm.count, "alreadyRunning": True}
-        spawned = swarm.spawn()
+        count = payload.get("count")
+        try:
+            count = int(count) if count is not None else None
+        except (TypeError, ValueError):
+            count = None
+        # Resolve hunt target by username (case-insensitive) if provided.
+        hunt_username = (payload.get("huntUsername") or "").strip().lower()
+        hunt_pid = (payload.get("huntPid") or "").strip()
+        game = app.state.game
+        if hunt_username and not hunt_pid:
+            for pl in game.players.values():
+                if pl.username.lower() == hunt_username:
+                    hunt_pid = pl.pid
+                    break
+        game.bot_hunt_pid = hunt_pid or ""
+        spawned = swarm.spawn(count)
         swarm.start()
-        return {"ok": True, "running": True, "count": spawned}
+        return {"ok": True, "running": True, "count": spawned,
+                "huntPid": game.bot_hunt_pid}
 
     @app.post("/api/teacher/stop_bots")
     async def teacher_stop_bots(payload: dict, x_teacher_token: str | None = Header(default=None)):
@@ -311,24 +407,15 @@ def create_app(game: GameState | None = None) -> FastAPI:
         return {"ok": True, "approved": True, "pid": player.pid}
 
     @app.get("/api/boilerplate/{name}")
-    async def boilerplate(name: str) -> FileResponse:
-        # Only allow specific known files; never join arbitrary paths.
-        allowed = {"character.html", "character.css", "character.js",
-                   "character.py",
-                   "manifest.example.json", "README.md"}
-        if name not in allowed:
-            return JSONResponse({"error": "not found"}, status_code=404)
-        return FileResponse(BOILERPLATE_DIR / name)
+    async def boilerplate(name: str):
+        # Boilerplate removed; editor starts blank.
+        return JSONResponse({"error": "not found"}, status_code=404)
 
     @app.get("/api/example/{slug}/{name}")
-    async def example_file(slug: str, name: str) -> FileResponse:
-        allowed_slugs = {"fire_wizard", "ice_tank", "medic", "rogue",
-                         "paladin", "bomber"}
-        allowed_names = {"character.html", "character.css", "character.js",
-                         "character.py", "manifest.json"}
-        if slug not in allowed_slugs or name not in allowed_names:
-            return JSONResponse({"error": "not found"}, status_code=404)
-        return FileResponse(EXAMPLES_DIR / slug / name)
+    async def example_file(slug: str, name: str):
+        # Example characters removed from the public API; students build
+        # their own from scratch.
+        return JSONResponse({"error": "not found"}, status_code=404)
 
     # Static files (CSS/JS for the frontend).
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -337,6 +424,9 @@ def create_app(game: GameState | None = None) -> FastAPI:
 
     @app.websocket("/ws")
     async def ws(websocket: WebSocket) -> None:
+        if not ws_is_authed(websocket, get_secret(app.state)):
+            await websocket.close(code=4401)
+            return
         await websocket.accept()
         pid: str | None = None
         game: GameState = app.state.game
@@ -447,6 +537,9 @@ def create_app(game: GameState | None = None) -> FastAPI:
         S2C_EVENT broadcasts as players. Sends a single welcome with world
         dimensions on connect.
         """
+        if not ws_is_authed(websocket, get_secret(app.state)):
+            await websocket.close(code=4401)
+            return
         await websocket.accept()
         game: GameState = app.state.game
         try:
@@ -532,10 +625,11 @@ app = create_app()
 def main() -> None:
     import uvicorn
 
+    port = int(os.environ.get("PORT", "8000"))
     uvicorn.run(
         "server.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=port,
         log_level="info",
         reload=False,
     )

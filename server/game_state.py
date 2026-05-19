@@ -43,11 +43,14 @@ SPEED_MULT_GLOBAL = 1.20
 
 # Universal skill moves (free for every character, not in their build budget).
 STAMINA_MAX = 100.0
-STAMINA_REGEN = 32.0     # per second
+# Regen: full bar in ~7 seconds.
+STAMINA_REGEN = STAMINA_MAX / 7.0
 SPRINT_DRAIN = 30.0      # per second while sprinting
 SPRINT_MIN_TO_START = 20 # can't start sprint below this
 SPRINT_SPEED_MULT = 1.55
-ROLL_COST = 35.0
+# Dodge-roll: consumes the entire stamina bar, and can only be triggered
+# when stamina is full again (so ~7s between rolls).
+ROLL_COST = STAMINA_MAX
 ROLL_DISTANCE = 130.0     # px instant
 ROLL_IFRAMES_MS = 280
 ROLL_COOLDOWN_S = 0.55
@@ -99,6 +102,9 @@ class Player:
     shield_until: float = 0.0
     # Active DoTs as list of (dps, until, source_pid)
     dots: List[Tuple[float, float, str]] = field(default_factory=list)
+    # Last damaging power name, for killcam attribution.
+    last_hit_power: str = ""
+    last_hit_by: str = ""
 
     def to_public(self, now: float) -> dict:
         return {
@@ -291,19 +297,18 @@ class GameState:
             self.events.append({"kind": "leave", "pid": pid, "username": username})
 
     def _spawn_point(self, team: int = 0) -> Tuple[float, float]:
+        import random as _r
         if team in (1, 2):
-            # Spawn on each team's side of the arena.
             cx = self.width * (0.22 if team == 1 else 0.78)
             cy = self.height / 2
-            n = sum(1 for p in self.players.values() if p.team == team)
-            angle = (n * 0.9) % (2 * math.pi)
-            r = min(self.width, self.height) * 0.12
-            return cx + math.cos(angle) * r, cy + math.sin(angle) * r
-        n = len(self.players)
-        angle = (n * 0.7) % (2 * math.pi)
-        r = min(self.width, self.height) * 0.25
-        cx, cy = self.width / 2, self.height / 2
-        return cx + math.cos(angle) * r, cy + math.sin(angle) * r
+            r = min(self.width, self.height) * 0.14
+            angle = _r.uniform(0.0, 2 * math.pi)
+            dist = r * _r.uniform(0.2, 1.0)
+            return cx + math.cos(angle) * dist, cy + math.sin(angle) * dist
+        # FFA: anywhere on the map, keeping a small margin from the edges.
+        margin = min(self.width, self.height) * 0.05
+        return (_r.uniform(margin, self.width - margin),
+                _r.uniform(margin, self.height - margin))
 
     # --- inputs -----------------------------------------------------------
 
@@ -340,9 +345,10 @@ class GameState:
             return False
         if now < p.roll_ready_at:
             return False
-        if p.stamina < ROLL_COST:
+        # Roll requires a FULL stamina bar.
+        if p.stamina < STAMINA_MAX - 0.01:
             return False
-        p.stamina -= ROLL_COST
+        p.stamina = 0.0
         p.roll_ready_at = now + ROLL_COOLDOWN_S
         # Roll in movement direction if any, else aim direction.
         mx, my = self._inputs.get(pid, (0.0, 0.0))
@@ -445,7 +451,8 @@ class GameState:
             # Inside the cone?
             if (dx * fx + dy * fy) / dist >= cone_cos:
                 self._apply_effects(target, on_hit, source=p, now=now,
-                                    impact_dx=dx, impact_dy=dy)
+                                    impact_dx=dx, impact_dy=dy,
+                                    power_name=power.name)
         self.melee_fx.append(MeleeFx(
             pid=p.pid, x=p.x, y=p.y, facing_x=fx, facing_y=fy,
             range=cast.range, arc_deg=cast.arcDeg, color=cast.color,
@@ -479,6 +486,7 @@ class GameState:
         now: float,
         impact_dx: float = 0.0,
         impact_dy: float = 0.0,
+        power_name: str = "",
     ) -> None:
         if not target.alive:
             return
@@ -496,15 +504,20 @@ class GameState:
             if same_team and kind in ("damage", "slow", "stun", "knockback", "dot"):
                 continue
             if kind == "damage":
-                self._damage(target, source, float(e["amount"]), now)
+                self._damage(target, source, float(e["amount"]), now, power_name=power_name)
             elif kind == "heal":
                 target.health = min(target.manifest.maxHealth,
                                     target.health + float(e["amount"]))
             elif kind == "slow":
                 until = now + float(e["durationMs"]) / 1000.0
-                if until > target.slow_until:
+                new_factor = float(e["factor"])
+                # Take the strongest (lowest factor) currently active; always refresh.
+                if now < target.slow_until:
+                    target.slow_factor = min(target.slow_factor, new_factor)
+                    target.slow_until = max(target.slow_until, until)
+                else:
+                    target.slow_factor = new_factor
                     target.slow_until = until
-                    target.slow_factor = float(e["factor"])
             elif kind == "stun":
                 until = now + float(e["durationMs"]) / 1000.0
                 if until > target.stun_until:
@@ -514,17 +527,27 @@ class GameState:
                 dist = math.hypot(impact_dx, impact_dy) or 1.0
                 nx = impact_dx / dist
                 ny = impact_dy / dist
-                # Instantaneous push (simple, predictable).
-                target.x += nx * strength * 0.05
-                target.y += ny * strength * 0.05
-                self._clamp_player(target)
+                # Velocity impulse — MOVE_DECEL carries the push for ~0.5s of motion.
+                target.vx += nx * strength * 1.6
+                target.vy += ny * strength * 1.6
             elif kind == "dot":
+                dps = float(e["dps"])
                 until = now + float(e["durationMs"]) / 1000.0
-                target.dots.append((float(e["dps"]), until, source.pid))
+                # Refresh-not-stack: same source overwrites its previous DoT timer.
+                replaced = False
+                for i, (d, u, src) in enumerate(target.dots):
+                    if src == source.pid:
+                        # Keep the stronger DPS; always refresh until forward.
+                        target.dots[i] = (max(d, dps), max(u, until), src)
+                        replaced = True
+                        break
+                if not replaced:
+                    target.dots.append((dps, until, source.pid))
             if not target.alive:
                 break
 
-    def _damage(self, target: Player, source: Player, amount: float, now: float) -> None:
+    def _damage(self, target: Player, source: Player, amount: float, now: float,
+                *, power_name: str = "") -> None:
         if now < target.shield_until and target.shield_amount > 0:
             absorbed = min(target.shield_amount, amount)
             target.shield_amount -= absorbed
@@ -535,6 +558,10 @@ class GameState:
         if amount <= 0:
             return
         target.health -= amount
+        if source.pid != target.pid:
+            target.last_hit_by = source.pid
+            if power_name:
+                target.last_hit_power = power_name
         self.events.append({
             "kind": "hit", "from": source.pid, "to": target.pid, "damage": amount,
         })
@@ -560,6 +587,8 @@ class GameState:
                 target.has_flag_team = 0
             self.events.append({
                 "kind": "death", "pid": target.pid, "by": source.pid,
+                "byName": source.username,
+                "byPower": target.last_hit_power or power_name or "",
                 "livesRemaining": target.lives_remaining,
                 "eliminated": target.eliminated,
             })
@@ -668,7 +697,8 @@ class GameState:
                     source = self.players.get(pr.pid)
                     if source is not None:
                         self._apply_effects(target, pr.on_hit, source=source, now=now,
-                                            impact_dx=pr.vx, impact_dy=pr.vy)
+                                            impact_dx=pr.vx, impact_dy=pr.vy,
+                                            power_name=pr.power_name)
                     pr.hit_pids.add(target.pid)
                     if not pr.pierce:
                         consumed = True
@@ -701,7 +731,8 @@ class GameState:
                     rr = (target.manifest.size / 2 + a.radius)
                     if dx * dx + dy * dy <= rr * rr:
                         self._apply_effects(target, a.on_tick, source=source, now=now,
-                                            impact_dx=dx, impact_dy=dy)
+                                            impact_dx=dx, impact_dy=dy,
+                                            power_name=a.power_name)
         self.areas = survivors
 
     def _step_melee_fx(self, now: float) -> None:

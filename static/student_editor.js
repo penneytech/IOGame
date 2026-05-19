@@ -1,13 +1,12 @@
-// Student editor: load boilerplate/example, run student JS in a sandboxed
-// iframe, validate the resulting manifest with the server, then store the
-// session and jump to the arena.
+// Student editor: run Python in Pyodide, validate the resulting manifest
+// with the server, then store the session and jump to the arena.
 
 (function () {
   const codeEl = document.getElementById('code');
   const outEl = document.getElementById('output');
   const runBtn = document.getElementById('runBtn');
   const joinBtn = document.getElementById('joinBtn');
-  const exampleSel = document.getElementById('example');
+  // (Students start from a blank editor and write build_character() themselves.)
   const usernameEl = document.getElementById('username');
 
   let validatedManifest = null;
@@ -21,8 +20,8 @@
       if (p.username) usernameEl.value = p.username;
     } catch (e) { /* ignore */ }
   }
-  // Detect old JavaScript code from previous sessions and clear it so we
-  // load the fresh Python boilerplate.
+  // Detect old JavaScript code from previous sessions and clear it so the
+  // editor starts blank.
   function looksLikeJs(src) {
     return /\bfunction\s+buildCharacter\s*\(/.test(src)
         || /\bvar\s+\w+\s*=/.test(src)
@@ -44,14 +43,16 @@
   usernameEl.addEventListener('input', persist);
 
   // ---- Sprite import widget ------------------------------------------------
-  const spriteSlot = document.getElementById('spriteSlot');
+  // Simplified flow: student exports a .c file from PiskelApp and uploads it
+  // here. We always insert as the "walk" animation — no slot picker, no
+  // PNG/GIF support.
   const spriteFile = document.getElementById('spriteFile');
   const spriteOut = document.getElementById('spriteOut');
   const spritePreview = document.getElementById('spritePreview');
   const spriteCopyBtn = document.getElementById('spriteCopyBtn');
   const spriteInsertBtn = document.getElementById('spriteInsertBtn');
+  const SPRITE_SLOT = 'walk';
   let lastSnippet = '';
-  let lastSlot = 'walk';
   let lastFrames = []; // array of data URIs
 
   function showPreview(uris) {
@@ -63,24 +64,23 @@
       const img = document.createElement('img');
       img.src = u;
       img.className = 'sprite-thumb';
-      // Show pixel art crisp.
       img.style.imageRendering = 'pixelated';
       spritePreview.appendChild(img);
     }
   }
-  function buildPythonSnippet(slot, uris) {
+  function buildPythonSnippet(uris) {
     const lines = uris.map(u => `        "${u}",`).join('\n');
     return `# Add inside your build_character() return dict:
 "sprites": {
-    "${slot}": [
+    "${SPRITE_SLOT}": [
 ${lines}
     ],
 },`;
   }
-  function setSnippet(slot, uris) {
-    lastSlot = slot;
+  function setSnippet(uris) {
     lastFrames = uris.slice();
-    lastSnippet = buildPythonSnippet(slot, uris);
+    lastSnippet = buildPythonSnippet(uris);
+    spriteOut.hidden = false;
     spriteOut.textContent = lastSnippet;
     showPreview(uris);
     spriteCopyBtn.disabled = false;
@@ -136,39 +136,24 @@ ${lines}
       const files = Array.from(spriteFile.files || []);
       if (!files.length) return;
       try {
-        // Single .c file? -> walk animation, all frames.
-        const cFile = files.find(f => f.name.toLowerCase().endsWith('.c'));
-        if (cFile) {
-          const text = await cFile.text();
-          const { frames } = parsePiskelC(text);
-          if (frames.length === 0) throw new Error('no frames in .c file');
-          // Cap at 4 (server-side limit).
-          const trimmed = frames.slice(0, 4);
-          // Sanity-check size budget.
-          const total = trimmed.reduce((n, u) => n + u.length, 0);
-          if (total > 64 * 1024) {
-            throw new Error(`frames total ${(total/1024).toFixed(1)} KB; keep export size small (max 64 KB).`);
-          }
-          setSnippet('walk', trimmed);
-          if (frames.length > 4) {
-            spriteOut.textContent += `\n\n# Note: your .c had ${frames.length} frames; only the first 4 were kept.`;
-          }
-          return;
+        const cFile = files.find(f => f.name.toLowerCase().endsWith('.c')) || files[0];
+        if (!cFile.name.toLowerCase().endsWith('.c')) {
+          throw new Error('Please upload a Piskel .c export.');
         }
-        // Otherwise: PNG/GIF frames into the chosen slot (max 4).
-        const imgs = files.slice(0, 4);
-        const dataURIs = [];
-        for (const f of imgs) {
-          if (!/^image\/(png|gif)$/.test(f.type)) {
-            throw new Error(`${f.name}: must be PNG or GIF (or a .c export)`);
-          }
-          if (f.size > 16 * 1024) {
-            throw new Error(`${f.name} is ${(f.size/1024).toFixed(1)} KB; keep under 16 KB`);
-          }
-          dataURIs.push(await readAsDataURL(f));
+        const text = await cFile.text();
+        const { frames } = parsePiskelC(text);
+        if (frames.length === 0) throw new Error('no frames in .c file');
+        const trimmed = frames.slice(0, 4);
+        const total = trimmed.reduce((n, u) => n + u.length, 0);
+        if (total > 64 * 1024) {
+          throw new Error(`frames total ${(total/1024).toFixed(1)} KB; keep your Piskel canvas small (max 64 KB).`);
         }
-        setSnippet(spriteSlot.value, dataURIs);
+        setSnippet(trimmed);
+        if (frames.length > 4) {
+          spriteOut.textContent += `\n\n# Note: your .c had ${frames.length} frames; only the first 4 were kept.`;
+        }
       } catch (e) {
+        spriteOut.hidden = false;
         spriteOut.textContent = 'Error: ' + (e.message || e);
         showPreview([]);
         spriteCopyBtn.disabled = true;
@@ -192,7 +177,7 @@ ${lines}
         // inside the build_character() return value, OR insert one before the
         // closing brace of the LAST return dict.
         const code = codeEl.value;
-        const slot = lastSlot;
+        const slot = SPRITE_SLOT;
         const slotBlock =
 `        "${slot}": [\n` +
           lastFrames.map(u => `            "${u}",`).join('\n') +
@@ -256,36 +241,15 @@ ${lines}
     return await r.text();
   }
 
-  async function loadExample(which) {
-    let url;
-    if (which === 'boilerplate') url = '/api/boilerplate/character.py';
-    else url = '/api/example/' + encodeURIComponent(which) + '/character.py';
-    const text = await loadFile(url);
-    codeEl.value = text;
-    persist();
-    outEl.textContent = 'Loaded ' + which + '. Click "Run & Validate".';
-    joinBtn.disabled = true;
-    validatedManifest = null;
-  }
-
-  exampleSel.addEventListener('change', () => loadExample(exampleSel.value));
-  const loadExBtn = document.getElementById('loadExampleBtn');
-  if (loadExBtn) {
-    loadExBtn.addEventListener('click', () => {
-      if (codeEl.value.trim() && !confirm('Replace your code with the selected example?')) return;
-      loadExample(exampleSel.value).catch(err => {
-        outEl.textContent = 'Could not load example: ' + err.message;
-      });
-    });
-  }
-
   const resetBtn = document.getElementById('resetBtn');
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
-      if (codeEl.value.trim() && !confirm('Replace your code with the Medic boilerplate?')) return;
-      loadExample('boilerplate').catch(err => {
-        outEl.textContent = 'Could not load boilerplate: ' + err.message;
-      });
+      if (codeEl.value.trim() && !confirm('Clear the editor?')) return;
+      codeEl.value = '';
+      persist();
+      outEl.textContent = 'Editor cleared. Write your build_character() function and click "Run & Validate".';
+      joinBtn.disabled = true;
+      validatedManifest = null;
     });
   }
 
@@ -309,11 +273,9 @@ ${lines}
     });
   }
 
-  // Initial load: if no saved code, fetch the boilerplate.
+  // Initial state: blank editor. Show a hint in the status area.
   if (!codeEl.value.trim()) {
-    loadExample('boilerplate').catch(err => {
-      outEl.textContent = 'Could not load boilerplate: ' + err.message;
-    });
+    outEl.textContent = 'Write a build_character() function, then click "Run & Validate".';
   }
 
   // Run the student's Python in Pyodide. Pyodide runs entirely in the
@@ -348,10 +310,32 @@ ${lines}
 
   async function runInPyodide(code) {
     const py = await loadPyodideOnce();
+    // Friendly pre-check: most common student mistake is pasting only the
+    // `return { ... }` block without the `def build_character():` wrapper.
+    if (!/\bdef\s+build_character\s*\(/.test(code)) {
+      throw new Error(
+        'Your code is missing the first line. It must start with:\n' +
+        '    def build_character():\n' +
+        'Everything else should be indented inside that function.'
+      );
+    }
     // Fresh namespace each run.
     const ns = py.toPy({});
     try {
-      await py.runPythonAsync(code, { globals: ns });
+      try {
+        await py.runPythonAsync(code, { globals: ns });
+      } catch (e) {
+        const msg = (e && e.message) ? e.message : String(e);
+        if (/'return' outside function/.test(msg)) {
+          throw new Error(
+            "Python says: 'return' outside function.\n" +
+            "Your `return { ... }` block needs to be INSIDE `def build_character():`.\n" +
+            "Make sure the very first line of your code is:  def build_character():\n" +
+            "and everything below it is indented (4 spaces)."
+          );
+        }
+        throw e;
+      }
       const builder = ns.get('build_character');
       if (!builder) {
         throw new Error('You must define a function called build_character().');

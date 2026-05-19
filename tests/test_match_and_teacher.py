@@ -89,13 +89,13 @@ def test_overbudget_manifest_rejected_by_validate_endpoint():
     app = app_with_token()
     with TestClient(app) as c:
         bad = {
-            "characterName": "OP", "color": "red", "size": 8,
+            "characterName": "OP", "color": "red", "size": 12,
             "speed": 400, "maxHealth": 300,
             "powers": [
                 {"name": f"P{i}", "key": k, "cooldownMs": 200,
                  "cast": {
                      "kind": "projectile", "color": "red",
-                     "speed": 900, "radius": 30, "lifetimeMs": 5000,
+                     "speed": 700, "radius": 30, "lifetimeMs": 5000,
                      "count": 6, "spreadDeg": 60, "pierce": True,
                      "onHit": [{"effect": "damage", "amount": 60}],
                  }}
@@ -120,7 +120,7 @@ def test_overbudget_join_via_websocket_rejected():
             "name": "Spam", "key": "space", "cooldownMs": 200,
             "cast": {
                 "kind": "projectile", "color": "red",
-                "speed": 900, "radius": 30, "lifetimeMs": 5000,
+                "speed": 700, "radius": 30, "lifetimeMs": 5000,
                 "count": 6, "spreadDeg": 60, "pierce": True,
                 "onHit": [{"effect": "damage", "amount": 60}],
             },

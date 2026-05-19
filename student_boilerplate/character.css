@@ -1,9 +1,0 @@
-.character-card {
-  background: #20243a;
-  color: white;
-  padding: 12px;
-  border-radius: 8px;
-  text-align: center;
-}
-.character-card .char-name { margin: 0; }
-.character-card .char-tagline { color: #9aa0b4; margin: 4px 0 0; }

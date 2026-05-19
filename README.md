@@ -16,10 +16,16 @@ The framework teaches:
 - functions
 - event handling
 
-## What the teacher does
+## What the host does
 
-1. Install Python 3.11 through 3.13.
-   - On macOS, if `python` is not available, use `python3`.
+1. **Open a terminal in VS Code.**
+
+   In the menu bar: **Terminal → New Terminal** (shortcut: ``Ctrl+` `` /
+   ``⌃+` ``). A panel will open at the bottom of the window. All
+   the commands below get typed into that panel and run by pressing
+   **Enter**. The terminal's current folder should already be this
+   project folder.
+
 2. From this folder run:
 
    ```bash
@@ -51,7 +57,7 @@ The framework teaches:
    The server listens on `0.0.0.0:8000` so other devices on the same LAN can
    connect.
 
-3. Find your LAN IP. Easiest way:
+2. Find your LAN IP. Easiest way:
 
    ```bash
    python scripts/print_lan_ip.py
@@ -59,9 +65,9 @@ The framework teaches:
 
    It prints something like `http://192.168.1.42:8000`.
 
-4. Share that URL with the class.
+3. Share that URL with the class.
 
-## What the students do
+## What the players do
 
 Students just open the URL in their browser. They never need to clone the repo.
 
@@ -82,30 +88,8 @@ Fire power: `Space` (or whatever key the power defines).
 classroom-io-game/
   server/                Python server (FastAPI + WebSockets)
   static/                Frontend pages and JS (no build step)
-  student_boilerplate/   Starter character files for students
-  examples/              Two finished example characters
   tests/                 Pytest unit + integration tests
   scripts/               Helper scripts (LAN IP, smoke test)
-```
-
-## Running tests
-
-First activate the virtual environment created earlier:
-
-```bash
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-pytest -q
-```
-
-## Running the smoke test
-
-The smoke test boots the server, connects multiple fake students over
-WebSockets, uploads manifests, sends movement and combat, and verifies that the
-world state is broadcast.
-
-```bash
-python scripts/smoke_test.py
 ```
 
 ## Security note
