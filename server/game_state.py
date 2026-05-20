@@ -912,6 +912,11 @@ class GameState:
             p.cooldowns.clear()
             p.dots.clear()
             p.shield_amount = 0
+            p.has_flag_team = 0
+        self.team_caps = {1: 0, 2: 0}
+        self.flags = {}
+        self.capture_zones = {}
+        self._capture_progress = {}
         self.match_status = "lobby"
         self.events.append({"kind": "reset"})
 
